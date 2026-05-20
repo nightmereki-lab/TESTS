@@ -1,9 +1,5 @@
 
 
--- Made by samet
--- Reposted by @da7mu on Discord
--- Modificado para incluir o botão de minimizar flutuante integrado
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -2091,13 +2087,11 @@ end)
                     Items["MainFrame"].Instance.Visible = true 
                 end
 
-                -- Atualiza a rotação do botão de minimizar integrado
-                if Window.MinimizeButton then
-                    TweenService:Create(
-                        Window.MinimizeButton,
-                        TweenInfo.new(0.2),
-                        { Rotation = Bool and 0 or 180 }
-                    ):Play()
+                -- Fecha frames/dropdowns abertos ao minimizar
+                if not Bool then
+                    for _, OpenFrame in Library.OpenFrames do
+                        OpenFrame:SetOpen(false)
+                    end
                 end
 
                 local Descendants = Items["MainFrame"].Instance:GetDescendants()
@@ -2127,7 +2121,7 @@ end)
                 end)
             end
 
-            -- Integração do Botão Flutuante de Minimizar
+            -- Integração do Botão Flutuante de Minimizar (Modificado sem rotação)
             if Data.MinimizeButton ~= false then
                 local ToggleButton = Instance.new("ImageButton")
                 ToggleButton.Name = "ToggleButton"
@@ -2138,7 +2132,7 @@ end)
                 ToggleButton.Image = "rbxassetid://128395878680071"
                 ToggleButton.AutoButtonColor = false
                 ToggleButton.Active = true
-                ToggleButton.ZIndex = 9999 -- Mantém acima de outras interfaces
+                ToggleButton.ZIndex = 9999
 
                 local UICorner = Instance.new("UICorner")
                 UICorner.CornerRadius = UDim.new(0, 18)
@@ -2532,7 +2526,7 @@ end)
                     ImageColor3 = Library.Theme["Text"],
                     BorderColor3 = FromRGB(0, 0, 0),
                     AnchorPoint = Vector2New(0, 0.5),
-                    Image = Section.Icon,
+                    Image = "rbxassetid://127136375066593",
                     BackgroundTransparency = 1,
                     Position = UDim2New(0, 10, 0.5, 0),
                     Size = UDim2New(0, 18, 0, 18),
@@ -2788,7 +2782,6 @@ end)
             return Toggle 
         end
 
-        -- ... (O restante dos elementos como Button, Slider, Dropdown etc permanecem inalterados)
         Library.Sections.Button = function(self, Data)
             Data = Data or { }
 
@@ -3188,14 +3181,15 @@ end)
                     TextColor3 = Library.Theme["Text"],
                     TextTransparency = 0.5,
                     Text = "--",
-                    Size = UDim2New(0, 0, 0, 15),
+                    Size = UDim2New(1, -45, 0, 15), -- CORRIGIDO: Reserva espaço para a seta
                     AnchorPoint = Vector2New(0, 0.5),
                     BorderSizePixel = 0,
                     BackgroundTransparency = 1,
                     Position = UDim2New(0, 8, 0.5, 0),
                     BorderColor3 = FromRGB(0, 0, 0),
-                    AutomaticSize = Enum.AutomaticSize.X,
-                    TextSize = 16
+                    TextSize = 16,
+                    TextTruncate = Enum.TextTruncate.AtEnd, -- CORRIGIDO: Corta texto longo com "..."
+                    TextXAlignment = Enum.TextXAlignment.Left
                 }):AddToTheme({TextColor3 = 'Text'})
                 
                 Items["Icon"] = Instances:Create("ImageLabel", {
@@ -3445,14 +3439,15 @@ end)
                     TextColor3 = Library.Theme["Text"],
                     TextTransparency = 0.5,
                     Text = Option,
-                    Size = UDim2New(0, 0, 0, 15),
+                    Size = UDim2New(1, -15, 0, 15), -- CORRIGIDO: Limita a largura para evitar vazar
                     AnchorPoint = Vector2New(0, 0.5),
                     BorderSizePixel = 0,
                     BackgroundTransparency = 1,
                     Position = UDim2New(0, 0, 0.5, 0),
                     BorderColor3 = FromRGB(0, 0, 0),
-                    AutomaticSize = Enum.AutomaticSize.X,
-                    TextSize = 16
+                    TextSize = 16,
+                    TextTruncate = Enum.TextTruncate.AtEnd, -- CORRIGIDO: Adiciona "..." em textos muito longos
+                    TextXAlignment = Enum.TextXAlignment.Left
                 }):AddToTheme({TextColor3 = 'Text'})
                 
                 local OptionData = {
@@ -3468,11 +3463,11 @@ end)
                     if Value == "Active" then
                         OptionData.Liner:Tween(nil, {BackgroundTransparency = 0, Size = UDim2New(0, 3, 1, 0)})
                         OptionData.Glow:Tween(nil, {ImageTransparency = 0.7})
-                        OptionData.Text:Tween(nil, {Position = UDim2New(0, 12, 0.5 ,0), TextTransparency = 0})
+                        OptionData.Text:Tween(nil, {Position = UDim2New(0, 12, 0.5 ,0), Size = UDim2New(1, -20, 0, 15), TextTransparency = 0}) -- CORRIGIDO: Adapta o tamanho durante a movimentação ativa
                     else
                         OptionData.Liner:Tween(nil, {BackgroundTransparency = 1, Size = UDim2New(0, 3, 0, 0)})
                         OptionData.Glow:Tween(nil, {ImageTransparency = 1})
-                        OptionData.Text:Tween(nil, {Position = UDim2New(0, 0, 0.5 ,0), TextTransparency = 0.5})
+                        OptionData.Text:Tween(nil, {Position = UDim2New(0, 0, 0.5 ,0), Size = UDim2New(1, -15, 0, 15), TextTransparency = 0.5}) -- CORRIGIDO: Retorna ao tamanho padrão inativo
                     end
                 end
 
