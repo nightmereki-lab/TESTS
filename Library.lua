@@ -1,5 +1,8 @@
+
+
 -- Made by samet
 -- Reposted by @da7mu on Discord
+-- Modificado para incluir o botão de minimizar flutuante integrado
 
 if getgenv().Library then
     getgenv().Library:Unload()
@@ -1819,7 +1822,8 @@ local Library do
 
                 Pages = { },
                 Items = { },
-                IsOpen = false
+                IsOpen = false,
+                MinimizeButton = nil
             }
 
             local Items = { } do
@@ -2087,6 +2091,15 @@ end)
                     Items["MainFrame"].Instance.Visible = true 
                 end
 
+                -- Atualiza a rotação do botão de minimizar integrado
+                if Window.MinimizeButton then
+                    TweenService:Create(
+                        Window.MinimizeButton,
+                        TweenInfo.new(0.2),
+                        { Rotation = Bool and 0 or 180 }
+                    ):Play()
+                end
+
                 local Descendants = Items["MainFrame"].Instance:GetDescendants()
                 TableInsert(Descendants, Items["MainFrame"].Instance)
 
@@ -2112,6 +2125,107 @@ end)
                     Debounce = false 
                     Items["MainFrame"].Instance.Visible = Window.IsOpen
                 end)
+            end
+
+            -- Integração do Botão Flutuante de Minimizar
+            if Data.MinimizeButton ~= false then
+                local ToggleButton = Instance.new("ImageButton")
+                ToggleButton.Name = "ToggleButton"
+                ToggleButton.Parent = Library.Holder.Instance
+                ToggleButton.Size = UDim2.new(0, 70, 0, 70)
+                ToggleButton.Position = UDim2.new(0.03, 0, 0.4, 0)
+                ToggleButton.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                ToggleButton.Image = "rbxassetid://128395878680071"
+                ToggleButton.AutoButtonColor = false
+                ToggleButton.Active = true
+                ToggleButton.ZIndex = 9999 -- Mantém acima de outras interfaces
+
+                local UICorner = Instance.new("UICorner")
+                UICorner.CornerRadius = UDim.new(0, 18)
+                UICorner.Parent = ToggleButton
+
+                local UIStroke = Instance.new("UIStroke")
+                UIStroke.Color = Color3.fromRGB(255, 0, 0)
+                UIStroke.Thickness = 3
+                UIStroke.Parent = ToggleButton
+
+                local UIGradient = Instance.new("UIGradient")
+                UIGradient.Color = ColorSequence.new{
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+                }
+                UIGradient.Rotation = 45
+                UIGradient.Parent = ToggleButton
+
+                local Shadow = Instance.new("Frame")
+                Shadow.Name = "Shadow"
+                Shadow.Parent = ToggleButton
+                Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+                Shadow.Position = UDim2.new(0.5, 0, 0.5, 4)
+                Shadow.Size = UDim2.new(1, 8, 1, 8)
+                Shadow.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                Shadow.BackgroundTransparency = 0.8
+                Shadow.ZIndex = 0
+
+                local ShadowCorner = Instance.new("UICorner")
+                ShadowCorner.CornerRadius = UDim.new(0, 20)
+                ShadowCorner.Parent = Shadow
+
+                ToggleButton.ZIndex = 2
+
+                ToggleButton.MouseEnter:Connect(function()
+                    TweenService:Create(ToggleButton, TweenInfo.new(0.15), { Size = UDim2.new(0, 75, 0, 75) }):Play()
+                end)
+
+                ToggleButton.MouseLeave:Connect(function()
+                    TweenService:Create(ToggleButton, TweenInfo.new(0.15), { Size = UDim2.new(0, 70, 0, 70) }):Play()
+                end)
+
+                ToggleButton.MouseButton1Click:Connect(function()
+                    Window:SetOpen(not Window.IsOpen)
+                end)
+
+                -- Dragging do botão flutuante integrado
+                local dragging = false
+                local dragInput, dragStart, startPos
+
+                local function updateDrag(input)
+                    local delta = input.Position - dragStart
+                    ToggleButton.Position = UDim2.new(
+                        startPos.X.Scale,
+                        startPos.X.Offset + delta.X,
+                        startPos.Y.Scale,
+                        startPos.Y.Offset + delta.Y
+                    )
+                end
+
+                ToggleButton.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        dragStart = input.Position
+                        startPos = ToggleButton.Position
+
+                        input.Changed:Connect(function()
+                            if input.UserInputState == Enum.UserInputState.End then
+                                dragging = false
+                            end
+                        end)
+                    end
+                end)
+
+                ToggleButton.InputChanged:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                        dragInput = input
+                    end
+                end)
+
+                UserInputService.InputChanged:Connect(function(input)
+                    if input == dragInput and dragging then
+                        updateDrag(input)
+                    end
+                end)
+
+                Window.MinimizeButton = ToggleButton
             end
 
             Library:Connect(UserInputService.InputBegan, function(Input)
@@ -2674,6 +2788,7 @@ end)
             return Toggle 
         end
 
+        -- ... (O restante dos elementos como Button, Slider, Dropdown etc permanecem inalterados)
         Library.Sections.Button = function(self, Data)
             Data = Data or { }
 
