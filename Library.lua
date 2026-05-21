@@ -1,5 +1,3 @@
-
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -1226,7 +1224,7 @@ local Library do
             local HuePositionY = MathClamp(Colorpicker.Hue, 0, 0.955)
 
             Items["PaletteDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(PaletteValueX, 0, PaletteValueY, 0)})
-            Items["HueDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, HuePositionY, 0)})
+            Items["HueDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, SlideY, 0)})
             Colorpicker:Update()
         end
 
@@ -1863,7 +1861,6 @@ local BottomTab = Instance.new("Frame")
 BottomTab.Parent = Items["Sidebar"].Instance
 BottomTab.AnchorPoint = Vector2.new(0, 1)
 BottomTab.Position = UDim2.new(0, 0, 1, 20)
-
 BottomTab.Size = UDim2.new(1, 0, 0, 105)
 BottomTab.BackgroundTransparency = 1
 
@@ -1872,11 +1869,6 @@ Avatar.Parent = BottomTab
 Avatar.BackgroundTransparency = 1
 Avatar.Size = UDim2.new(0, 52, 0, 52)
 Avatar.Position = UDim2.new(0, 12, 0, 12)
-Avatar.Image = Players:GetUserThumbnailAsync(
-    LocalPlayer.UserId,
-    Enum.ThumbnailType.HeadShot,
-    Enum.ThumbnailSize.Size420x420
-)
 
 local AvatarCorner = Instance.new("UICorner")
 AvatarCorner.CornerRadius = UDim.new(1, 0)
@@ -1888,10 +1880,125 @@ Username.BackgroundTransparency = 1
 Username.Position = UDim2.new(0, 74, 0, 16)
 Username.Size = UDim2.new(1, -84, 0, 18)
 Username.TextXAlignment = Enum.TextXAlignment.Left
-Username.Text = LocalPlayer.Name
 Username.FontFace = Library.Font
 Username.TextSize = 16
 Username.TextColor3 = Library.Theme.Text
+
+local anonConfigPath = "homxiide/anonymous_config.json"
+local isAnonymous = false
+
+if isfile(anonConfigPath) then
+    local success, decoded = pcall(function()
+        return HttpService:JSONDecode(readfile(anonConfigPath))
+    end)
+    if success and decoded and decoded.Anonymous ~= nil then
+        isAnonymous = decoded.Anonymous
+    end
+else
+    writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = false}))
+end
+
+local function updateProfileDisplay()
+    if isAnonymous then
+        Avatar.Image = "rbxassetid://10444634125"
+        Username.Text = "Anonymous"
+    else
+        Avatar.Image = Players:GetUserThumbnailAsync(
+            LocalPlayer.UserId,
+            Enum.ThumbnailType.HeadShot,
+            Enum.ThumbnailSize.Size420x420
+        )
+        Username.Text = LocalPlayer.Name
+    end
+end
+
+updateProfileDisplay()
+
+local function showAnonymousMenu()
+    if Items["MainFrame"].Instance:FindFirstChild("AnonymousDialog") then
+        return
+    end
+
+    local dialog = Instance.new("Frame")
+    dialog.Name = "AnonymousDialog"
+    dialog.Size = UDim2.new(0, 300, 0, 150)
+    dialog.Position = UDim2.new(0.5, -150, 0.5, -75)
+    dialog.BackgroundColor3 = Library.Theme.Background
+    dialog.Parent = Items["MainFrame"].Instance
+    dialog.ZIndex = 10000
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Library.Theme.Outline
+    stroke.Thickness = 1
+    stroke.Parent = dialog
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = dialog
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0.4, 0)
+    label.Position = UDim2.new(0, 0, 0.1, 0)
+    label.Text = "Deseja ativar o modo anônimo?"
+    label.TextColor3 = Library.Theme.Text
+    label.FontFace = Library.Font
+    label.TextSize = 16
+    label.BackgroundTransparency = 1
+    label.Parent = dialog
+
+    local yesBtn = Instance.new("TextButton")
+    yesBtn.Size = UDim2.new(0.4, 0, 0.25, 0)
+    yesBtn.Position = UDim2.new(0.08, 0, 0.6, 0)
+    yesBtn.Text = "Sim"
+    yesBtn.BackgroundColor3 = Library.Theme.Accent
+    yesBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    yesBtn.FontFace = Library.Font
+    yesBtn.TextSize = 14
+    yesBtn.Parent = dialog
+
+    local yesCorner = Instance.new("UICorner")
+    yesCorner.CornerRadius = UDim.new(0, 6)
+    yesCorner.Parent = yesBtn
+
+    local noBtn = Instance.new("TextButton")
+    noBtn.Size = UDim2.new(0.4, 0, 0.25, 0)
+    noBtn.Position = UDim2.new(0.52, 0, 0.6, 0)
+    noBtn.Text = "Não"
+    noBtn.BackgroundColor3 = Library.Theme.Element
+    noBtn.TextColor3 = Library.Theme.Text
+    noBtn.FontFace = Library.Font
+    noBtn.TextSize = 14
+    noBtn.Parent = dialog
+
+    local noCorner = Instance.new("UICorner")
+    noCorner.CornerRadius = UDim.new(0, 6)
+    noCorner.Parent = noBtn
+
+    yesBtn.MouseButton1Click:Connect(function()
+        isAnonymous = true
+        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = true}))
+        updateProfileDisplay()
+        dialog:Destroy()
+    end)
+
+    noBtn.MouseButton1Click:Connect(function()
+        isAnonymous = false
+        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = false}))
+        updateProfileDisplay()
+        dialog:Destroy()
+    end)
+end
+
+local ProfileButton = Instance.new("TextButton")
+ProfileButton.Size = UDim2.new(1, 0, 1, 0)
+ProfileButton.BackgroundTransparency = 1
+ProfileButton.Text = ""
+ProfileButton.Parent = BottomTab
+ProfileButton.ZIndex = 5
+
+ProfileButton.MouseButton1Click:Connect(function()
+    showAnonymousMenu()
+end)
 
 local ExpiresLabel = Instance.new("TextLabel")
 ExpiresLabel.Parent = BottomTab
@@ -1923,7 +2030,16 @@ Library:Thread(function()
     while true do
         task.wait(3)
         currentIndex = currentIndex % #phrases + 1
+
+        local fadeOut = TweenService:Create(Countdown, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1})
+        fadeOut:Play()
+        fadeOut.Completed:Wait()
+        
         Countdown.Text = phrases[currentIndex]
+        
+        local fadeIn = TweenService:Create(Countdown, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
+        fadeIn:Play()
+        fadeIn.Completed:Wait()
     end
 end)
 
@@ -2421,6 +2537,7 @@ end)
             return setmetatable(Page, Library.Pages)
         end
 
+        local OriginalSectionFunction = Library.Pages.Section
         Library.Pages.Section = function(self, Data)
             Data = Data or { }
 
