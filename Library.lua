@@ -1,3 +1,5 @@
+
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -1224,7 +1226,7 @@ local Library do
             local HuePositionY = MathClamp(Colorpicker.Hue, 0, 0.955)
 
             Items["PaletteDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(PaletteValueX, 0, PaletteValueY, 0)})
-            Items["HueDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, SlideY, 0)})
+            Items["HueDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, HuePositionY, 0)})
             Colorpicker:Update()
         end
 
@@ -1310,6 +1312,8 @@ local Library do
 
         return Colorpicker, Items 
     end
+
+    local Keys = Keys
 
     Library.CreateKeybind = function(self, Data)
         local Keybind = {
@@ -1914,18 +1918,30 @@ end
 
 updateProfileDisplay()
 
-local function showAnonymousMenu()
-    if Items["MainFrame"].Instance:FindFirstChild("AnonymousDialog") then
+local ProfileButton = Instance.new("TextButton")
+ProfileButton.Size = UDim2.new(1, 0, 1, 0)
+ProfileButton.BackgroundTransparency = 1
+ProfileButton.Text = ""
+ProfileButton.Parent = BottomTab
+ProfileButton.ZIndex = 5
+
+local currentDialog = nil
+
+local function toggleAnonymousMenu()
+    if currentDialog then
+        currentDialog:Destroy()
+        currentDialog = nil
         return
     end
 
     local dialog = Instance.new("Frame")
     dialog.Name = "AnonymousDialog"
-    dialog.Size = UDim2.new(0, 300, 0, 150)
-    dialog.Position = UDim2.new(0.5, -150, 0.5, -75)
+    dialog.Size = UDim2.new(0, 260, 0, 80)
+    dialog.Position = UDim2.new(0.5, -130, 0.5, -40)
     dialog.BackgroundColor3 = Library.Theme.Background
     dialog.Parent = Items["MainFrame"].Instance
     dialog.ZIndex = 10000
+    currentDialog = dialog
 
     local stroke = Instance.new("UIStroke")
     stroke.Color = Library.Theme.Outline
@@ -1937,67 +1953,58 @@ local function showAnonymousMenu()
     corner.Parent = dialog
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0.4, 0)
-    label.Position = UDim2.new(0, 0, 0.1, 0)
-    label.Text = "Deseja ativar o modo anônimo?"
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0.08, 0, 0, 0)
+    label.Text = "Modo Anônimo"
     label.TextColor3 = Library.Theme.Text
     label.FontFace = Library.Font
     label.TextSize = 16
+    label.TextXAlignment = Enum.TextXAlignment.Left
     label.BackgroundTransparency = 1
     label.Parent = dialog
 
-    local yesBtn = Instance.new("TextButton")
-    yesBtn.Size = UDim2.new(0.4, 0, 0.25, 0)
-    yesBtn.Position = UDim2.new(0.08, 0, 0.6, 0)
-    yesBtn.Text = "Sim"
-    yesBtn.BackgroundColor3 = Library.Theme.Accent
-    yesBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-    yesBtn.FontFace = Library.Font
-    yesBtn.TextSize = 14
-    yesBtn.Parent = dialog
+    local toggleContainer = Instance.new("TextButton")
+    toggleContainer.Size = UDim2.new(0, 45, 0, 24)
+    toggleContainer.Position = UDim2.new(0.92, -45, 0.5, -12)
+    toggleContainer.BackgroundColor3 = isAnonymous and Library.Theme.Accent or Library.Theme.Element
+    toggleContainer.Text = ""
+    toggleContainer.AutoButtonColor = false
+    toggleContainer.Parent = dialog
 
-    local yesCorner = Instance.new("UICorner")
-    yesCorner.CornerRadius = UDim.new(0, 6)
-    yesCorner.Parent = yesBtn
+    local tcCorner = Instance.new("UICorner")
+    tcCorner.CornerRadius = UDim.new(1, 0)
+    tcCorner.Parent = toggleContainer
 
-    local noBtn = Instance.new("TextButton")
-    noBtn.Size = UDim2.new(0.4, 0, 0.25, 0)
-    noBtn.Position = UDim2.new(0.52, 0, 0.6, 0)
-    noBtn.Text = "Não"
-    noBtn.BackgroundColor3 = Library.Theme.Element
-    noBtn.TextColor3 = Library.Theme.Text
-    noBtn.FontFace = Library.Font
-    noBtn.TextSize = 14
-    noBtn.Parent = dialog
+    local tcStroke = Instance.new("UIStroke")
+    tcStroke.Color = Library.Theme.Outline
+    tcStroke.Thickness = 1
+    tcStroke.Parent = toggleContainer
 
-    local noCorner = Instance.new("UICorner")
-    noCorner.CornerRadius = UDim.new(0, 6)
-    noCorner.Parent = noBtn
+    local circle = Instance.new("Frame")
+    circle.Size = UDim2.new(0, 16, 0, 16)
+    circle.Position = isAnonymous and UDim2.new(1, -20, 0.5, -8) or UDim2.new(0, 4, 0.5, -8)
+    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    circle.Parent = toggleContainer
 
-    yesBtn.MouseButton1Click:Connect(function()
-        isAnonymous = true
-        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = true}))
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1, 0)
+    circleCorner.Parent = circle
+
+    toggleContainer.MouseButton1Click:Connect(function()
+        isAnonymous = not isAnonymous
+        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = isAnonymous}))
         updateProfileDisplay()
-        dialog:Destroy()
-    end)
 
-    noBtn.MouseButton1Click:Connect(function()
-        isAnonymous = false
-        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = false}))
-        updateProfileDisplay()
-        dialog:Destroy()
+        local targetPos = isAnonymous and UDim2.new(1, -20, 0.5, -8) or UDim2.new(0, 4, 0.5, -8)
+        local targetColor = isAnonymous and Library.Theme.Accent or Library.Theme.Element
+        
+        TweenService:Create(circle, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+        TweenService:Create(toggleContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetColor}):Play()
     end)
 end
 
-local ProfileButton = Instance.new("TextButton")
-ProfileButton.Size = UDim2.new(1, 0, 1, 0)
-ProfileButton.BackgroundTransparency = 1
-ProfileButton.Text = ""
-ProfileButton.Parent = BottomTab
-ProfileButton.ZIndex = 5
-
 ProfileButton.MouseButton1Click:Connect(function()
-    showAnonymousMenu()
+    toggleAnonymousMenu()
 end)
 
 local ExpiresLabel = Instance.new("TextLabel")
