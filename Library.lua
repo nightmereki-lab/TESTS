@@ -80,7 +80,6 @@ local Library do
             Assets = "homxiide/Assets",
         },
 
-        -- Ignore below
         Pages = { },
         Sections = { },
 
@@ -195,14 +194,12 @@ local Library do
 
     Library.Theme = TableClone(Themes["Preset"])
 
-    -- Folders
     for Index, Value in Library.Folders do 
         if not isfolder(Value) then
             makefolder(Value)
         end
     end
 
-    -- Tweening
     local Tween = { } do
         Tween.__index = Tween
 
@@ -296,7 +293,6 @@ local Library do
         end
     end
 
-    -- Instances
     local Instances = { } do
         Instances.__index = Instances
 
@@ -495,7 +491,6 @@ local Library do
 
                 StartMouse = UserInputService:GetMouseLocation()
 
-                -- store offsets, not absolute screen pos
                 StartPosition = Vector2New(Gui.Position.X.Offset, Gui.Position.Y.Offset)
                 StartSize = Vector2New(Gui.Size.X.Offset, Gui.Size.Y.Offset)
                 
@@ -588,7 +583,6 @@ local Library do
         end
     end
 
-    -- Custom font
     local CustomFont = { } do
         function CustomFont:New(Name, Weight, Style, Data)
             if not isfile(Data.Id) then 
@@ -1853,7 +1847,6 @@ local Library do
                 })
                 
                 
-                --// Sidebar bottom separator (ends tab list)
 local BottomSeparator = Instance.new("Frame")
 BottomSeparator.Parent = Items["Sidebar"].Instance
 BottomSeparator.AnchorPoint = Vector2.new(0, 1)
@@ -1862,7 +1855,6 @@ BottomSeparator.Size = UDim2.new(1, 0, 0, 1)
 BottomSeparator.BackgroundColor3 = Library.Theme.Outline
 BottomSeparator.BorderSizePixel = 0
 
---// Bottom Player Info (tab-style)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
@@ -1875,7 +1867,6 @@ BottomTab.Position = UDim2.new(0, 0, 1, 20)
 BottomTab.Size = UDim2.new(1, 0, 0, 105)
 BottomTab.BackgroundTransparency = 1
 
--- Avatar (BIGGER)
 local Avatar = Instance.new("ImageLabel")
 Avatar.Parent = BottomTab
 Avatar.BackgroundTransparency = 1
@@ -1891,7 +1882,6 @@ local AvatarCorner = Instance.new("UICorner")
 AvatarCorner.CornerRadius = UDim.new(1, 0)
 AvatarCorner.Parent = Avatar
 
--- Username
 local Username = Instance.new("TextLabel")
 Username.Parent = BottomTab
 Username.BackgroundTransparency = 1
@@ -1903,20 +1893,18 @@ Username.FontFace = Library.Font
 Username.TextSize = 16
 Username.TextColor3 = Library.Theme.Text
 
--- Expires label
 local ExpiresLabel = Instance.new("TextLabel")
 ExpiresLabel.Parent = BottomTab
 ExpiresLabel.BackgroundTransparency = 1
 ExpiresLabel.Position = UDim2.new(0, 74, 0, 38)
 ExpiresLabel.Size = UDim2.new(0, 52, 0, 16)
 ExpiresLabel.TextXAlignment = Enum.TextXAlignment.Left
-ExpiresLabel.Text = "Expires:"
+ExpiresLabel.Text = "Status:"
 ExpiresLabel.FontFace = Library.Font
 ExpiresLabel.TextSize = 13
 ExpiresLabel.TextTransparency = 0.4
 ExpiresLabel.TextColor3 = Library.Theme.Text
 
--- Countdown text
 local Countdown = Instance.new("TextLabel")
 Countdown.Parent = BottomTab
 Countdown.BackgroundTransparency = 1
@@ -1927,18 +1915,16 @@ Countdown.FontFace = Library.Font
 Countdown.TextSize = 13
 Countdown.TextColor3 = Library.Theme.Accent
 
---// COUNTDOWN LOGIC
-local expiresDuration = tonumber(Data.ExpiresSeconds) or (24 * 60 * 60)
-local endTime = os.time() + math.max(0, math.floor(expiresDuration))
+local phrases = {"Best Hub", "100% Safe", "Fast Loading", "No Lag", "Undetected", "Active Support"}
+Countdown.Text = phrases[1]
+local currentIndex = 1
 
-RunService.Heartbeat:Connect(function()
-    local remaining = math.max(0, endTime - os.time())
-
-    local hours = math.floor(remaining / 3600)
-    local minutes = math.floor((remaining % 3600) / 60)
-    local seconds = remaining % 60
-
-    Countdown.Text = string.format("%02dh %02dm %02ds", hours, minutes, seconds)
+Library:Thread(function()
+    while true do
+        task.wait(3)
+        currentIndex = currentIndex % #phrases + 1
+        Countdown.Text = phrases[currentIndex]
+    end
 end)
 
                 Instances:Create("Frame", {
@@ -2087,7 +2073,6 @@ end)
                     Items["MainFrame"].Instance.Visible = true 
                 end
 
-                -- Fecha frames/dropdowns abertos ao minimizar
                 if not Bool then
                     for _, OpenFrame in Library.OpenFrames do
                         OpenFrame:SetOpen(false)
@@ -2121,7 +2106,6 @@ end)
                 end)
             end
 
-            -- Integração do Botão Flutuante de Minimizar (Modificado sem rotação)
             if Data.MinimizeButton ~= false then
                 local ToggleButton = Instance.new("ImageButton")
                 ToggleButton.Name = "ToggleButton"
@@ -2179,7 +2163,6 @@ end)
                     Window:SetOpen(not Window.IsOpen)
                 end)
 
-                -- Dragging do botão flutuante integrado
                 local dragging = false
                 local dragInput, dragStart, startPos
 
@@ -3181,14 +3164,14 @@ end)
                     TextColor3 = Library.Theme["Text"],
                     TextTransparency = 0.5,
                     Text = "--",
-                    Size = UDim2New(1, -45, 0, 15), -- CORRIGIDO: Reserva espaço para a seta
+                    Size = UDim2New(1, -45, 0, 15),
                     AnchorPoint = Vector2New(0, 0.5),
                     BorderSizePixel = 0,
                     BackgroundTransparency = 1,
                     Position = UDim2New(0, 8, 0.5, 0),
                     BorderColor3 = FromRGB(0, 0, 0),
                     TextSize = 16,
-                    TextTruncate = Enum.TextTruncate.AtEnd, -- CORRIGIDO: Corta texto longo com "..."
+                    TextTruncate = Enum.TextTruncate.AtEnd,
                     TextXAlignment = Enum.TextXAlignment.Left
                 }):AddToTheme({TextColor3 = 'Text'})
                 
@@ -3439,14 +3422,14 @@ end)
                     TextColor3 = Library.Theme["Text"],
                     TextTransparency = 0.5,
                     Text = Option,
-                    Size = UDim2New(1, -15, 0, 15), -- CORRIGIDO: Limita a largura para evitar vazar
+                    Size = UDim2New(1, -15, 0, 15),
                     AnchorPoint = Vector2New(0, 0.5),
                     BorderSizePixel = 0,
                     BackgroundTransparency = 1,
                     Position = UDim2New(0, 0, 0.5, 0),
                     BorderColor3 = FromRGB(0, 0, 0),
                     TextSize = 16,
-                    TextTruncate = Enum.TextTruncate.AtEnd, -- CORRIGIDO: Adiciona "..." em textos muito longos
+                    TextTruncate = Enum.TextTruncate.AtEnd,
                     TextXAlignment = Enum.TextXAlignment.Left
                 }):AddToTheme({TextColor3 = 'Text'})
                 
@@ -3463,11 +3446,11 @@ end)
                     if Value == "Active" then
                         OptionData.Liner:Tween(nil, {BackgroundTransparency = 0, Size = UDim2New(0, 3, 1, 0)})
                         OptionData.Glow:Tween(nil, {ImageTransparency = 0.7})
-                        OptionData.Text:Tween(nil, {Position = UDim2New(0, 12, 0.5 ,0), Size = UDim2New(1, -20, 0, 15), TextTransparency = 0}) -- CORRIGIDO: Adapta o tamanho durante a movimentação ativa
+                        OptionData.Text:Tween(nil, {Position = UDim2New(0, 12, 0.5 ,0), Size = UDim2New(1, -20, 0, 15), TextTransparency = 0})
                     else
                         OptionData.Liner:Tween(nil, {BackgroundTransparency = 1, Size = UDim2New(0, 3, 0, 0)})
                         OptionData.Glow:Tween(nil, {ImageTransparency = 1})
-                        OptionData.Text:Tween(nil, {Position = UDim2New(0, 0, 0.5 ,0), Size = UDim2New(1, -15, 0, 15), TextTransparency = 0.5}) -- CORRIGIDO: Retorna ao tamanho padrão inativo
+                        OptionData.Text:Tween(nil, {Position = UDim2New(0, 0, 0.5 ,0), Size = UDim2New(1, -15, 0, 15), TextTransparency = 0.5})
                     end
                 end
 
@@ -3957,9 +3940,6 @@ end)
     end
 end
 
-
-
--- loadstring-friendly wrappers / aliases
 Library.LucideIconsUrl = "https://raw.githubusercontent.com/Footagesus/Icons/refs/heads/main/lucide/dist/Icons.lua"
 Library.IconPacks = Library.IconPacks or {}
 Library.ActiveIconPack = "lucide"
