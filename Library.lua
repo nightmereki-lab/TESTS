@@ -1226,7 +1226,7 @@ local Library do
             local HuePositionY = MathClamp(Colorpicker.Hue, 0, 0.955)
 
             Items["PaletteDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(PaletteValueX, 0, PaletteValueY, 0)})
-            Items["HueDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, HuePositionY, 0)})
+            Items["HueDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, SlideY, 0)})
             Colorpicker:Update()
         end
 
@@ -1944,8 +1944,8 @@ local function toggleAnonymousMenu()
     currentDialog = dialog
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Library.Theme.Outline
-    stroke.Thickness = 1
+    stroke.Color = Color3.fromRGB(255, 0, 0)
+    stroke.Thickness = 1.5
     stroke.Parent = dialog
 
     local corner = Instance.new("UICorner")
@@ -1961,6 +1961,7 @@ local function toggleAnonymousMenu()
     label.TextSize = 16
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.BackgroundTransparency = 1
+    label.ZIndex = 10001
     label.Parent = dialog
 
     local toggleContainer = Instance.new("TextButton")
@@ -1969,6 +1970,7 @@ local function toggleAnonymousMenu()
     toggleContainer.BackgroundColor3 = isAnonymous and Library.Theme.Accent or Library.Theme.Element
     toggleContainer.Text = ""
     toggleContainer.AutoButtonColor = false
+    toggleContainer.ZIndex = 10001
     toggleContainer.Parent = dialog
 
     local tcCorner = Instance.new("UICorner")
@@ -1976,14 +1978,15 @@ local function toggleAnonymousMenu()
     tcCorner.Parent = toggleContainer
 
     local tcStroke = Instance.new("UIStroke")
-    tcStroke.Color = Library.Theme.Outline
-    tcStroke.Thickness = 1
+    tcStroke.Color = Color3.fromRGB(255, 0, 0)
+    tcStroke.Thickness = 1.5
     tcStroke.Parent = toggleContainer
 
     local circle = Instance.new("Frame")
     circle.Size = UDim2.new(0, 16, 0, 16)
     circle.Position = isAnonymous and UDim2.new(1, -20, 0.5, -8) or UDim2.new(0, 4, 0.5, -8)
     circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    circle.ZIndex = 10002
     circle.Parent = toggleContainer
 
     local circleCorner = Instance.new("UICorner")
