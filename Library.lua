@@ -2636,7 +2636,7 @@ end)
                     ImageColor3 = Library.Theme["Text"],
                     BorderColor3 = FromRGB(0, 0, 0),
                     AnchorPoint = Vector2New(0, 0.5),
-                    Image = "rbxassetid://127136375066593",
+                    Image = Section.Icon,
                     BackgroundTransparency = 1,
                     Position = UDim2New(0, 10, 0.5, 0),
                     Size = UDim2New(0, 18, 0, 18),
