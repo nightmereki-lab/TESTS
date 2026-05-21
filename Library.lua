@@ -187,7 +187,7 @@ local Library do
             ["Background"] = FromRGB(10, 11, 12),
             ["Outline"] = FromRGB(22, 24, 23),
             ["Inline"] = FromRGB(18, 20, 22),
-            ["Accent"] = FromRGB(155, 229, 222),
+            ["Accent"] = FromRGB(255, 0, 0),
             ["Text"] = FromRGB(236, 245, 253),
             ["Element"] = FromRGB(25, 29, 31)
         }
