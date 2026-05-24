@@ -332,8 +332,33 @@ local Library do
                 self:Tween(TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, NewX, 0, NewY)})
             end
         
+            local function IsInteractive(obj)
+                if not obj then return false end
+                if obj:IsA("TextButton") or obj:IsA("ImageButton") or obj:IsA("TextBox") or obj:IsA("ScrollingFrame") then
+                    return true
+                end
+                if obj.Name == "RealSlider" or obj.Name == "Accent" or obj.Name == "Dragger" or StringFind(obj.Name, "Slider") then
+                    return true
+                end
+                local parent = obj.Parent
+                while parent do
+                    if parent.Name == "Content" or parent.Name == "OptionHolder" or parent.Name == "ColorpickerWindow" or parent.Name == "KeybindWindow" then
+                        return true
+                    end
+                    parent = parent.Parent
+                end
+                return false
+            end
+
             self:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                    -- Verifica se o clique ocorreu sobre algum elemento interativo
+                    local MousePos = UserInputService:GetMouseLocation()
+                    local Objects = UserInputService:GetGuiObjectsAtPosition(MousePos)
+                    if Objects and Objects[1] and IsInteractive(Objects[1]) then
+                        return
+                    end
+
                     Dragging = true
                     DragStart = Input.Position
                     StartPosition = Gui.Position
