@@ -1815,8 +1815,19 @@ local Library do
                 Pages = { },
                 Items = { },
                 IsOpen = false,
-                MinimizeButton = nil
+                MinimizeButton = nil,
+                SearchableElements = { }
             }
+
+            function Window:RegisterElement(Element, Type, Name, Section, Page)
+                TableInsert(self.SearchableElements, {
+                    Element = Element,
+                    Type = Type,
+                    Name = Name,
+                    Section = Section,
+                    Page = Page
+                })
+            end
 
             local Items = { } do
                 Items["MainFrame"] = Instances:Create("Frame", {
@@ -2128,6 +2139,56 @@ end)
                     BorderSizePixel = 0,
                     BackgroundColor3 = Library.Theme["Outline"]
                 }):AddToTheme({BackgroundColor3 = 'Outline'})
+
+                -- SEÇÃO: BARRA DE BUSCA (Abaixo de Top, Acima das Abas/Páginas)
+                Items["SearchBarContainer"] = Instances:Create("Frame", {
+                    Parent = Items["Sidebar"].Instance,
+                    Name = "SearchBarContainer",
+                    Position = UDim2New(0, 8, 0, 78),
+                    Size = UDim2New(1, -16, 0, 32),
+                    BackgroundColor3 = Library.Theme["Element"],
+                    BorderSizePixel = 0
+                }):AddToTheme({BackgroundColor3 = 'Element'})
+
+                Instances:Create("UICorner", {
+                    Parent = Items["SearchBarContainer"].Instance,
+                    CornerRadius = UDimNew(0, 6)
+                })
+
+                Instances:Create("UIStroke", {
+                    Parent = Items["SearchBarContainer"].Instance,
+                    Color = Library.Theme["Outline"],
+                    ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                }):AddToTheme({Color = 'Outline'})
+
+                Items["SearchIcon"] = Instances:Create("ImageLabel", {
+                    Parent = Items["SearchBarContainer"].Instance,
+                    Name = "SearchIcon",
+                    ScaleType = Enum.ScaleType.Fit,
+                    Image = "rbxassetid://11419712174",
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 8, 0.5, -8),
+                    Size = UDim2New(0, 16, 0, 16),
+                    BorderSizePixel = 0,
+                    ImageColor3 = Library.Theme["Text"],
+                    ImageTransparency = 0.5
+                }):AddToTheme({ImageColor3 = 'Text'})
+
+                Items["SearchInput"] = Instances:Create("TextBox", {
+                    Parent = Items["SearchBarContainer"].Instance,
+                    Name = "SearchInput",
+                    FontFace = Library.Font,
+                    PlaceholderText = "Search section or Fun",
+                    PlaceholderColor3 = FromRGB(133, 139, 143),
+                    TextSize = 14,
+                    TextColor3 = Library.Theme["Text"],
+                    Text = "",
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 30, 0, 0),
+                    Size = UDim2New(1, -38, 1, 0),
+                    BorderSizePixel = 0,
+                    TextXAlignment = Enum.TextXAlignment.Left
+                }):AddToTheme({TextColor3 = 'Text'})
                 
                 Items["Pages"] = Instances:Create("ScrollingFrame", {
                     Parent = Items["Sidebar"].Instance,
@@ -2140,9 +2201,9 @@ end)
                     MidImage = "rbxassetid://128693616966482",
                     BorderColor3 = FromRGB(0, 0, 0),
                     ScrollBarThickness = 3,
-                    Size = UDim2New(1, -16, 1, -185),
+                    Size = UDim2New(1, -16, 1, -225), -- Altura ajustada para liberar espaço para a barra de busca (-40px)
                     BackgroundTransparency = 1,
-                    Position = UDim2New(0, 8, 0, 78),
+                    Position = UDim2New(0, 8, 0, 118), -- Deslocado para baixo para não sobrepor a busca
                     BottomImage = "rbxassetid://128693616966482",
                     TopImage = "rbxassetid://128693616966482"
                 }):AddToTheme({ScrollBarImageColor3 = 'Accent'})
@@ -2175,6 +2236,267 @@ end)
                 
                 Window.Items = Items
             end
+
+            -- SEÇÃO: POPUP DE RESULTADOS DE BUSCA (Centralizado na biblioteca)
+            local searchOverlay = Instances:Create("Frame", {
+                Parent = Items["MainFrame"].Instance,
+                Name = "SearchOverlay",
+                Size = UDim2New(1, 0, 1, 0),
+                Position = UDim2New(0, 0, 0, 0),
+                BackgroundColor3 = FromRGB(10, 10, 10),
+                BackgroundTransparency = 1,
+                Visible = false,
+                ZIndex = 500
+            })
+
+            local searchPopup = Instances:Create("Frame", {
+                Parent = searchOverlay.Instance,
+                Name = "SearchPopup",
+                AnchorPoint = Vector2New(0.5, 0.5),
+                Position = UDim2New(0.5, 0, 0.5, 0),
+                Size = UDim2New(0, 420, 0, 320),
+                BackgroundColor3 = Library.Theme["Inline"],
+                BorderSizePixel = 0,
+                ZIndex = 501
+            }):AddToTheme({BackgroundColor3 = 'Inline'})
+
+            Instances:Create("UICorner", {
+                Parent = searchPopup.Instance,
+                CornerRadius = UDimNew(0, 8)
+            })
+
+            local SearchPopupStroke = Instances:Create("UIStroke", {
+                Parent = searchPopup.Instance,
+                Color = Library.Theme["Outline"],
+                Thickness = 1.5,
+                ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            }):AddToTheme({Color = 'Outline'})
+
+            local SearchPopupTitle = Instances:Create("TextLabel", {
+                Parent = searchPopup.Instance,
+                FontFace = Library.Font,
+                Text = "Search Results",
+                TextColor3 = Library.Theme["Text"],
+                TextSize = 16,
+                Size = UDim2New(1, -20, 0, 40),
+                Position = UDim2New(0, 15, 0, 0),
+                BackgroundTransparency = 1,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                ZIndex = 502
+            }):AddToTheme({TextColor3 = 'Text'})
+
+            local SearchCloseBtn = Instances:Create("TextButton", {
+                Parent = searchPopup.Instance,
+                FontFace = Library.Font,
+                Text = "X",
+                TextColor3 = Library.Theme["Text"],
+                TextSize = 16,
+                Size = UDim2New(0, 30, 0, 30),
+                Position = UDim2New(1, -35, 0, 5),
+                BackgroundTransparency = 1,
+                ZIndex = 502
+            }):AddToTheme({TextColor3 = 'Text'})
+
+            local SearchScroll = Instances:Create("ScrollingFrame", {
+                Parent = searchPopup.Instance,
+                Active = true,
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Size = UDim2New(1, -20, 1, -55),
+                Position = UDim2New(0, 10, 0, 45),
+                CanvasSize = UDim2New(0, 0, 0, 0),
+                AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                ScrollBarThickness = 3,
+                ScrollBarImageColor3 = Library.Theme["Accent"],
+                ZIndex = 502
+            }):AddToTheme({ScrollBarImageColor3 = 'Accent'})
+
+            Instances:Create("UIListLayout", {
+                Parent = SearchScroll.Instance,
+                Padding = UDimNew(0, 6),
+                SortOrder = Enum.SortOrder.LayoutOrder
+            })
+
+            local isSearchOpen = false
+            local function setSearchOpen(bool)
+                if isSearchOpen == bool then return end
+                isSearchOpen = bool
+
+                if bool then
+                    searchOverlay.Instance.Visible = true
+                    searchPopup.Instance.Size = UDim2New(0, 300, 0, 200)
+                    searchOverlay.Instance.BackgroundTransparency = 1
+                    
+                    TweenService:Create(searchOverlay.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        BackgroundTransparency = 0.5
+                    }):Play()
+                    
+                    TweenService:Create(searchPopup.Instance, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                        Size = UDim2New(0, 420, 0, 320)
+                    }):Play()
+                else
+                    TweenService:Create(searchOverlay.Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                        BackgroundTransparency = 1
+                    }):Play()
+                    
+                    local tween = TweenService:Create(searchPopup.Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                        Size = UDim2New(0, 300, 0, 200)
+                    })
+                    tween:Play()
+                    tween.Completed:Connect(function()
+                        if not isSearchOpen then
+                            searchOverlay.Instance.Visible = false
+                        end
+                    end)
+                end
+            end
+
+            SearchCloseBtn:Connect("MouseButton1Click", function()
+                setSearchOpen(false)
+                Items["SearchInput"].Instance.Text = ""
+            end)
+
+            local function performSearch(query)
+                for _, child in SearchScroll.Instance:GetChildren() do
+                    if child:IsA("Frame") or child:IsA("TextLabel") then
+                        child:Destroy()
+                    end
+                end
+
+                if query == "" then
+                    setSearchOpen(false)
+                    return
+                end
+
+                setSearchOpen(true)
+                query = query:lower()
+
+                local matches = {}
+                for _, info in ipairs(Window.SearchableElements) do
+                    if info.Name:lower():find(query) then
+                        table.insert(matches, info)
+                    end
+                end
+
+                if #matches == 0 then
+                    local noResults = Instances:Create("TextLabel", {
+                        Parent = SearchScroll.Instance,
+                        FontFace = Library.Font,
+                        Text = "No results found.",
+                        TextColor3 = Library.Theme["Text"],
+                        TextSize = 14,
+                        Size = UDim2New(1, 0, 0, 40),
+                        BackgroundTransparency = 1,
+                        TextTransparency = 0.5,
+                        ZIndex = 503
+                    }):AddToTheme({TextColor3 = 'Text'})
+                    return
+                end
+
+                for _, match in ipairs(matches) do
+                    local itemFrame = Instances:Create("Frame", {
+                        Parent = SearchScroll.Instance,
+                        Size = UDim2New(1, -6, 0, 42),
+                        BackgroundColor3 = Library.Theme["Element"],
+                        BorderSizePixel = 0,
+                        ZIndex = 503
+                    }):AddToTheme({BackgroundColor3 = 'Element'})
+
+                    Instances:Create("UICorner", {
+                        Parent = itemFrame.Instance,
+                        CornerRadius = UDimNew(0, 6)
+                    })
+
+                    local itemStroke = Instances:Create("UIStroke", {
+                        Parent = itemFrame.Instance,
+                        Color = Library.Theme["Outline"],
+                        Thickness = 1,
+                        ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    }):AddToTheme({Color = 'Outline'})
+
+                    local pathText = string.format("[%s > %s]", match.Page.Name, match.Section.Name)
+                    local infoLabel = Instances:Create("TextLabel", {
+                        Parent = itemFrame.Instance,
+                        FontFace = Library.Font,
+                        Text = string.format("%s <font color='rgb(160, 160, 160)'>%s</font>", match.Name, pathText),
+                        TextColor3 = Library.Theme["Text"],
+                        TextSize = 14,
+                        RichText = true,
+                        Size = UDim2New(0.7, 0, 1, 0),
+                        Position = UDim2New(0, 10, 0, 0),
+                        BackgroundTransparency = 1,
+                        TextXAlignment = Enum.TextXAlignment.Left,
+                        ZIndex = 504
+                    }):AddToTheme({TextColor3 = 'Text'})
+
+                    local actionButton = Instances:Create("TextButton", {
+                        Parent = itemFrame.Instance,
+                        Size = UDim2New(0, 80, 0, 26),
+                        Position = UDim2New(1, -90, 0.5, -13),
+                        BackgroundColor3 = Library.Theme["Accent"],
+                        Text = "",
+                        ZIndex = 504
+                    }):AddToTheme({BackgroundColor3 = 'Accent'})
+
+                    Instances:Create("UICorner", {
+                        Parent = actionButton.Instance,
+                        CornerRadius = UDimNew(0, 4)
+                    })
+
+                    local actionText = Instances:Create("TextLabel", {
+                        Parent = actionButton.Instance,
+                        FontFace = Library.Font,
+                        Text = "Interact",
+                        TextColor3 = FromRGB(255, 255, 255),
+                        TextSize = 12,
+                        Size = UDim2New(1, 0, 1, 0),
+                        BackgroundTransparency = 1,
+                        ZIndex = 505
+                    })
+
+                    if match.Type == "Toggle" then
+                        actionText.Instance.Text = match.Element:Get() and "On" or "Off"
+                        actionButton:ChangeItemTheme({BackgroundColor3 = match.Element:Get() and "Accent" or "Element"})
+                    elseif match.Type == "Button" then
+                        actionText.Instance.Text = "Click"
+                    elseif match.Type == "Slider" then
+                        actionText.Instance.Text = tostring(match.Element:Get())
+                    else
+                        actionText.Instance.Text = "Go to"
+                    end
+
+                    actionButton:Connect("MouseButton1Click", function()
+                        if match.Type == "Toggle" then
+                            match.Element:Set(not match.Element:Get())
+                            actionText.Instance.Text = match.Element:Get() and "On" or "Off"
+                            actionButton:ChangeItemTheme({BackgroundColor3 = match.Element:Get() and "Accent" or "Element"})
+                        elseif match.Type == "Button" then
+                            match.Element:Press()
+                        elseif match.Type == "Slider" or match.Type == "Dropdown" or match.Type == "Textbox" then
+                            for _, p in ipairs(Window.Pages) do
+                                p:Turn(p == match.Page)
+                            end
+                            setSearchOpen(false)
+                            Items["SearchInput"].Instance.Text = ""
+                            
+                            -- Efeito temporário de destaque na seção alvo
+                            local originalOutlineColor = match.Section.Items["SectionOutline"].Instance.BackgroundColor3
+                            match.Section.Items["SectionOutline"].Instance.BackgroundColor3 = Library.Theme["Accent"]
+                            task.delay(1, function()
+                                match.Section.Items["SectionOutline"].Instance.BackgroundColor3 = originalOutlineColor
+                            end)
+                        else
+                            for _, p in ipairs(Window.Pages) do
+                                p:Turn(p == match.Page)
+                            end
+                        end
+                    end)
+                end
+            end
+
+            Library:Connect(Items["SearchInput"].Instance:GetPropertyChangedSignal("Text"), function()
+                performSearch(Items["SearchInput"].Instance.Text)
+            end)
             
             local Debounce = false
 
@@ -2885,6 +3207,8 @@ end)
 
             Toggle:Set(Toggle.Default)
 
+            Toggle.Section.Window:RegisterElement(Toggle, "Toggle", Toggle.Name, Toggle.Section, Toggle.Page)
+
             Library.SetFlags[Toggle.Flag] = function(Value)
                 Toggle:Set(Value)
             end
@@ -2979,6 +3303,8 @@ end)
             Items["Button"]:Connect("MouseButton1Down", function()
                 Button:Press()
             end)
+
+            Button.Section.Window:RegisterElement(Button, "Button", Button.Name, Button.Section, Button.Page)
 
             return Button
         end
@@ -3201,6 +3527,8 @@ end)
             if Slider.Default then
                 Slider:Set(Slider.Default)
             end
+
+            Slider.Section.Window:RegisterElement(Slider, "Slider", Slider.Name, Slider.Section, Slider.Page)
 
             Library.SetFlags[Slider.Flag] = function(Value)
                 Slider:Set(Value)
@@ -3687,6 +4015,8 @@ end)
                 Dropdown:Set(Dropdown.Default)
             end
 
+            Dropdown.Section.Window:RegisterElement(Dropdown, "Dropdown", Dropdown.Name, Dropdown.Section, Dropdown.Page)
+
             Library.SetFlags[Dropdown.Flag] = function(Value)
                 Dropdown:Set(Value)
             end
@@ -3959,6 +4289,8 @@ end)
             if Textbox.Default then
                 Textbox:Set(Textbox.Default)
             end
+
+            Textbox.Section.Window:RegisterElement(Textbox, "Textbox", Textbox.Name, Textbox.Section, Textbox.Page)
 
             Library.SetFlags[Textbox.Flag] = function(Value)
                 Textbox:Set(Value)
