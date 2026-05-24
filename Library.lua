@@ -1,3 +1,5 @@
+
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -352,9 +354,17 @@ local Library do
 
             self:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-                    -- Verifica se o clique ocorreu sobre algum elemento interativo
+                    -- Busca o PlayerGui do jogador local de forma segura
                     local MousePos = UserInputService:GetMouseLocation()
-                    local Objects = UserInputService:GetGuiObjectsAtPosition(MousePos)
+                    local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+                    local Objects
+                    
+                    pcall(function()
+                        local gui = playerGui or CoreGui
+                        Objects = gui:GetGuiObjectsAtPosition(MousePos.X, MousePos.Y)
+                    end)
+
+                    -- Se o clique foi sobre um elemento interativo, cancela o arrasto da janela
                     if Objects and Objects[1] and IsInteractive(Objects[1]) then
                         return
                     end
@@ -977,13 +987,13 @@ local Library do
             Colorpicker:Update()
         end
 
-        local Debounce = false
+        local Bounce = false
         local RenderStepped  
 
         function Colorpicker:SetOpen(Bool)
-            if Debounce then return end
+            if Bounce then return end
             Colorpicker.IsOpen = Bool
-            Debounce = true 
+            Bounce = true 
 
             if Colorpicker.IsOpen then 
                 Items["ColorpickerWindow"].Instance.Visible = true
@@ -1032,7 +1042,7 @@ local Library do
             end
             
             NewTween.Tween.Completed:Connect(function()
-                Debounce = false 
+                Bounce = false 
                 Items["ColorpickerWindow"].Instance.Visible = Colorpicker.IsOpen
                 task_wait(0.2)
                 Items["ColorpickerWindow"].Instance.Parent = not Colorpicker.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
@@ -2558,7 +2568,7 @@ local Library do
                 })
                 
                 Items["Text"] = Instances:Create("TextLabel", {
-                    Parent = Items["Top"].Instance,
+                    Parent = Items["Section"].Instance,
                     FontFace = Library.Font,
                     TextWrapped = true,
                     TextColor3 = Library.Theme["Text"],
