@@ -2326,11 +2326,11 @@ end)
                     searchOverlay.Instance.Visible = true
                     searchPopup.Instance.Size = UDim2New(0, 300, 0, 200)
                     searchOverlay.Instance.BackgroundTransparency = 1
-
+                    
                     TweenService:Create(searchOverlay.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                         BackgroundTransparency = 0.5
                     }):Play()
-
+                    
                     TweenService:Create(searchPopup.Instance, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
                         Size = UDim2New(0, 420, 0, 320)
                     }):Play()
@@ -2338,7 +2338,7 @@ end)
                     TweenService:Create(searchOverlay.Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                         BackgroundTransparency = 1
                     }):Play()
-
+                    
                     local tween = TweenService:Create(searchPopup.Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                         Size = UDim2New(0, 300, 0, 200)
                     })
@@ -2356,203 +2356,15 @@ end)
                 Items["SearchInput"].Instance.Text = ""
             end)
 
-            -- Cache do nome lower para evitar custo em loop a cada tecla
-            local searchIndex = {}
-            do
-                for i, info in ipairs(Window.SearchableElements) do
-                    searchIndex[i] = info
-                    info._searchLower = info._searchLower or (info.Name and info.Name:lower() or "")
-                end
-            end
-
-            -- Pool/reuse dos itens do resultado (evita Destroy/Create por tecla)
-            local resultsPool = {}
-            local noResultsLabel = nil
-
-            local elemColor = Library.Theme["Element"]
-            local hoverColor = Color3.fromRGB(
-                math.min(elemColor.R * 255 + 12, 255),
-                math.min(elemColor.G * 255 + 12, 255),
-                math.min(elemColor.B * 255 + 12, 255)
-            )
-
-            local function getPooledItem()
-                local idx = #resultsPool + 1
-                local pooled = resultsPool[idx]
-                if pooled then return pooled end
-
-                pooled = {
-                    Button = Instances:Create("TextButton", {
-                        Parent = SearchScroll.Instance,
-                        Size = UDim2New(1, -6, 0, 42),
-                        BackgroundColor3 = Library.Theme["Element"],
-                        BorderSizePixel = 0,
-                        Text = "",
-                        AutoButtonColor = false,
-                        ZIndex = 503
-                    }):AddToTheme({BackgroundColor3 = 'Element'}).Instance,
-                    Icon = nil,
-                    Info = nil,
-                    Arrow = nil,
-                    _tEnter = nil,
-                    _tLeave = nil,
-                    _connClick = nil,
-                    Match = nil
-                }
-
-                Instances:Create("UICorner", {
-                    Parent = pooled.Button,
-                    CornerRadius = UDimNew(0, 6)
-                })
-
-                pooled.Button.Stroke = Instances:Create("UIStroke", {
-                    Parent = pooled.Button,
-                    Color = Library.Theme["Outline"],
-                    Thickness = 1,
-                    ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                }):AddToTheme({Color = 'Outline'})
-
-                pooled.Icon = Instances:Create("ImageLabel", {
-                    Parent = pooled.Button,
-                    Size = UDim2New(0, 18, 0, 18),
-                    Position = UDim2New(0, 10, 0.5, -9),
-                    BackgroundTransparency = 1,
-                    Image = "",
-                    ImageColor3 = Library.Theme["Text"],
-                    BorderSizePixel = 0,
-                    ZIndex = 504
-                }):AddToTheme({ImageColor3 = 'Text'}).Instance
-
-                pooled.Info = Instances:Create("TextLabel", {
-                    Parent = pooled.Button,
-                    FontFace = Library.Font,
-                    Text = "",
-                    TextColor3 = Library.Theme["Text"],
-                    TextSize = 14,
-                    RichText = true,
-                    Size = UDim2New(1, -70, 1, 0),
-                    Position = UDim2New(0, 36, 0, 0),
-                    BackgroundTransparency = 1,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 504
-                }):AddToTheme({TextColor3 = 'Text'}).Instance
-
-                pooled.Arrow = Instances:Create("TextLabel", {
-                    Parent = pooled.Button,
-                    FontFace = Library.Font,
-                    Text = "→",
-                    TextColor3 = Library.Theme["Accent"],
-                    TextSize = 16,
-                    Size = UDim2New(0, 30, 1, 0),
-                    Position = UDim2New(1, -40, 0, 0),
-                    BackgroundTransparency = 1,
-                    TextXAlignment = Enum.TextXAlignment.Right,
-                    ZIndex = 504
-                }):AddToTheme({TextColor3 = 'Accent'}).Instance
-
-                pooled._tEnter = TweenService:Create(pooled.Button, TweenInfo.new(0.15), {
-                    BackgroundColor3 = hoverColor
-                })
-                pooled._tLeave = TweenService:Create(pooled.Button, TweenInfo.new(0.15), {
-                    BackgroundColor3 = Library.Theme["Element"]
-                })
-
-                pooled.Button.MouseEnter:Connect(function()
-                    pooled._tEnter:Play()
-                end)
-
-                pooled.Button.MouseLeave:Connect(function()
-                    pooled._tLeave:Play()
-                end)
-
-                pooled._connClick = pooled.Button.MouseButton1Click:Connect(function()
-                    if not pooled.Match then return end
-
-                    local match = pooled.Match
-
-                    for _, p in ipairs(Window.Pages) do
-                        p:Turn(p == match.Page)
-                    end
-
-                    setSearchOpen(false)
-                    Items["SearchInput"].Instance.Text = ""
-
-                    local sectionOutline = match.Section.Items["SectionOutline"].Instance
-                    local originalColor = sectionOutline.BackgroundColor3
-
-                    TweenService:Create(sectionOutline, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                        BackgroundColor3 = Library.Theme["Accent"]
-                    }):Play()
-
-                    task.delay(1, function()
-                        TweenService:Create(sectionOutline, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                            BackgroundThickness = 0,
-                            BackgroundColor3 = originalColor
-                        }):Play()
-                    end)
-                end)
-
-                pooled.Button.Visible = false
-
-                resultsPool[idx] = pooled
-                return pooled
-            end
-
-            local function updateResults(matches)
-                if #matches == 0 then
-                    if not noResultsLabel or not noResultsLabel.Parent then
-                        noResultsLabel = Instances:Create("TextLabel", {
-                            Parent = SearchScroll.Instance,
-                            FontFace = Library.Font,
-                            Text = "No results found.",
-                            TextColor3 = Library.Theme["Text"],
-                            TextSize = 14,
-                            Size = UDim2New(1, 0, 0, 40),
-                            BackgroundTransparency = 1,
-                            TextTransparency = 0.5,
-                            ZIndex = 503
-                        }):AddToTheme({TextColor3 = 'Text'}).Instance
-                    end
-
-                    noResultsLabel.Visible = true
-                    for i = 1, #resultsPool do
-                        resultsPool[i].Button.Visible = false
-                    end
-                    return
-                end
-
-                if noResultsLabel then
-                    noResultsLabel.Visible = false
-                end
-
-                for i, match in ipairs(matches) do
-                    local pooled = resultsPool[i] or getPooledItem()
-
-                    pooled.Match = match
-                    pooled.Button.Visible = true
-
-                    pooled.Icon.Image = match.Page.Icon
-
-                    local pathText = string.format("[%s > %s]", match.Page.Name, match.Section.Name)
-                    pooled.Info.Text = string.format(
-                        "%s <font color='rgb(150, 150, 150)'>%s</font>",
-                        match.Name,
-                        pathText
-                    )
-                end
-
-                for i = #matches + 1, #resultsPool do
-                    resultsPool[i].Button.Visible = false
-                end
-            end
-
             local function performSearch(query)
-                if query == nil or query == "" then
-                    setSearchOpen(false)
-                    if noResultsLabel then noResultsLabel.Visible = false end
-                    for i = 1, #resultsPool do
-                        resultsPool[i].Button.Visible = false
+                for _, child in SearchScroll.Instance:GetChildren() do
+                    if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") then
+                        child:Destroy()
                     end
+                end
+
+                if query == "" then
+                    setSearchOpen(false)
                     return
                 end
 
@@ -2560,32 +2372,144 @@ end)
                 query = query:lower()
 
                 local matches = {}
-                for _, info in ipairs(searchIndex) do
-                    if info._searchLower:find(query, 1, true) then
+                for _, info in ipairs(Window.SearchableElements) do
+                    if info.Name:lower():find(query) then
                         table.insert(matches, info)
                     end
                 end
 
-                updateResults(matches)
-            end
-
-            -- Debounce para não pesquisar a cada caractere imediatamente
-            local searchDebounce = false
-            local searchLastText = ""
-
-            Library:Connect(Items["SearchInput"].Instance:GetPropertyChangedSignal("Text"), function()
-                if searchDebounce then
-                    searchLastText = Items["SearchInput"].Instance.Text
+                if #matches == 0 then
+                    local noResults = Instances:Create("TextLabel", {
+                        Parent = SearchScroll.Instance,
+                        FontFace = Library.Font,
+                        Text = "No results found.",
+                        TextColor3 = Library.Theme["Text"],
+                        TextSize = 14,
+                        Size = UDim2New(1, 0, 0, 40),
+                        BackgroundTransparency = 1,
+                        TextTransparency = 0.5,
+                        ZIndex = 503
+                    }):AddToTheme({TextColor3 = 'Text'})
                     return
                 end
 
-                searchDebounce = true
-                searchLastText = Items["SearchInput"].Instance.Text
+                for _, match in ipairs(matches) do
+                    -- Toda a linha agora é um botão para redirecionar o usuário
+                    local itemButton = Instances:Create("TextButton", {
+                        Parent = SearchScroll.Instance,
+                        Size = UDim2New(1, -6, 0, 42),
+                        BackgroundColor3 = Library.Theme["Element"],
+                        BorderSizePixel = 0,
+                        Text = "",
+                        AutoButtonColor = false,
+                        ZIndex = 503
+                    }):AddToTheme({BackgroundColor3 = 'Element'})
 
-                task.delay(0.15, function()
-                    searchDebounce = false
-                    performSearch(searchLastText)
-                end)
+                    Instances:Create("UICorner", {
+                        Parent = itemButton.Instance,
+                        CornerRadius = UDimNew(0, 6)
+                    })
+
+                    local itemStroke = Instances:Create("UIStroke", {
+                        Parent = itemButton.Instance,
+                        Color = Library.Theme["Outline"],
+                        Thickness = 1,
+                        ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    }):AddToTheme({Color = 'Outline'})
+
+                    -- Ícone correspondente à página na esquerda
+                    local pageIcon = Instances:Create("ImageLabel", {
+                        Parent = itemButton.Instance,
+                        Size = UDim2New(0, 18, 0, 18),
+                        Position = UDim2New(0, 10, 0.5, -9),
+                        BackgroundTransparency = 1,
+                        Image = match.Page.Icon,
+                        ImageColor3 = Library.Theme["Text"],
+                        BorderSizePixel = 0,
+                        ZIndex = 504
+                    }):AddToTheme({ImageColor3 = 'Text'})
+
+                    -- Texto explicativo mostrando o caminho [Página > Seção] Nome da Função
+                    local pathText = string.format("[%s > %s]", match.Page.Name, match.Section.Name)
+                    local infoLabel = Instances:Create("TextLabel", {
+                        Parent = itemButton.Instance,
+                        FontFace = Library.Font,
+                        Text = string.format("%s <font color='rgb(150, 150, 150)'>%s</font>", match.Name, pathText),
+                        TextColor3 = Library.Theme["Text"],
+                        TextSize = 14,
+                        RichText = true,
+                        Size = UDim2New(1, -70, 1, 0),
+                        Position = UDim2New(0, 36, 0, 0),
+                        BackgroundTransparency = 1,
+                        TextXAlignment = Enum.TextXAlignment.Left,
+                        ZIndex = 504
+                    }):AddToTheme({TextColor3 = 'Text'})
+
+                    -- Indicador de seta à direita demonstrando link de navegação
+                    local arrowLabel = Instances:Create("TextLabel", {
+                        Parent = itemButton.Instance,
+                        FontFace = Library.Font,
+                        Text = "→",
+                        TextColor3 = Library.Theme["Accent"],
+                        TextSize = 16,
+                        Size = UDim2New(0, 30, 1, 0),
+                        Position = UDim2New(1, -40, 0, 0),
+                        BackgroundTransparency = 1,
+                        TextXAlignment = Enum.TextXAlignment.Right,
+                        ZIndex = 504
+                    }):AddToTheme({TextColor3 = 'Accent'})
+
+                    -- Efeito suave de hover ao passar o mouse por cima
+                    local elemColor = Library.Theme["Element"]
+                    local hoverColor = Color3.fromRGB(
+                        math.min(elemColor.R * 255 + 12, 255),
+                        math.min(elemColor.G * 255 + 12, 255),
+                        math.min(elemColor.B * 255 + 12, 255)
+                    )
+
+                    itemButton:Connect("MouseEnter", function()
+                        TweenService:Create(itemButton.Instance, TweenInfo.new(0.15), {
+                            BackgroundColor3 = hoverColor
+                        }):Play()
+                    end)
+
+                    itemButton:Connect("MouseLeave", function()
+                        TweenService:Create(itemButton.Instance, TweenInfo.new(0.15), {
+                            BackgroundColor3 = Library.Theme["Element"]
+                        }):Play()
+                    end)
+
+                    -- Ao clicar: Leva você direto para a página e destaca a seção com a cor do tema
+                    itemButton:Connect("MouseButton1Click", function()
+                        -- 1. Redireciona para a aba correta
+                        for _, p in ipairs(Window.Pages) do
+                            p:Turn(p == match.Page)
+                        end
+
+                        -- 2. Fecha a busca e limpa o campo de texto
+                        setSearchOpen(false)
+                        Items["SearchInput"].Instance.Text = ""
+
+                        -- 3. Faz o Outline da Seção piscar para chamar sua atenção
+                        local sectionOutline = match.Section.Items["SectionOutline"].Instance
+                        local originalColor = sectionOutline.BackgroundColor3
+
+                        TweenService:Create(sectionOutline, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                            BackgroundColor3 = Library.Theme["Accent"]
+                        }):Play()
+
+                        task.delay(1, function()
+                            TweenService:Create(sectionOutline, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                                BackgroundThickness = 0,
+                                BackgroundColor3 = originalColor
+                            }):Play()
+                        end)
+                    end)
+                end
+            end
+
+            Library:Connect(Items["SearchInput"].Instance:GetPropertyChangedSignal("Text"), function()
+                performSearch(Items["SearchInput"].Instance.Text)
             end)
             
             local Debounce = false
