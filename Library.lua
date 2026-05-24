@@ -2879,15 +2879,25 @@ local Library do
         Library.Sections.Slider = function(self, Data)
             Data = Data or {}
 
+            local Min = Data.Min or Data.min or 0
+            local Max = Data.Max or Data.max or 100
+            local Default = Data.Default or Data.default or 0
+
+            -- Proteção para garantir que os valores limites não sejam NaN ou Infinitos
+            if Min ~= Min or Min == math.huge or Min == -math.huge then Min = 0 end
+            if Max ~= Max or Max == math.huge or Max == -math.huge then Max = 100 end
+            if Default ~= Default then Default = Min end
+            if Min >= Max then Max = Min + 1 end
+
             local Slider = {
                 Window = self.Window,
                 Page = self.Page,
                 Section = self,
                 Name = Data.Name or Data.name or "Slider",
                 Flag = Data.Flag or Data.flag or Library:NextFlag(),
-                Min = Data.Min or Data.min or 0,
-                Default = Data.Default or Data.default or 0,
-                Max = Data.Max or Data.max or 100,
+                Min = Min,
+                Default = Default,
+                Max = Max,
                 Suffix = Data.Suffix or Data.suffix or "",
                 Decimals = Data.Decimals or Data.decimals or 1,
                 Callback = Data.Callback or Data.callback or function() end,
@@ -3027,10 +3037,32 @@ local Library do
             end
 
             function Slider:Set(Value)
-                Slider.Value = Library:Round(MathClamp(Value, Slider.Min, Slider.Max), Slider.Decimals)
+                -- Verifica se o valor passado é um número válido e diferente de NaN
+                if typeof(Value) ~= "number" or Value ~= Value then
+                    Value = Slider.Min
+                end
+
+                local ClampedValue = MathClamp(Value, Slider.Min, Slider.Max)
+                Slider.Value = Library:Round(ClampedValue, Slider.Decimals)
+
+                -- Dupla validação pós-arredondamento
+                if Slider.Value ~= Slider.Value then
+                    Slider.Value = Slider.Min
+                end
+
                 Library.Flags[Slider.Flag] = Slider.Value
 
-                Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2New((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1, 0)})
+                local Range = Slider.Max - Slider.Min
+                local Scale = (Range <= 0) and 0 or (Slider.Value - Slider.Min) / Range
+
+                -- Protege a escala de distorções visuais
+                if Scale ~= Scale or Scale == math.huge or Scale == -math.huge then
+                    Scale = 0
+                else
+                    Scale = MathClamp(Scale, 0, 1)
+                end
+
+                Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2New(Scale, 0, 1, 0)})
                 Items["Value"].Instance.Text = StringFormat("%s%s", Slider.Value, Slider.Suffix)
 
                 if Slider.Callback then Library:SafeCall(Slider.Callback, Slider.Value) end
@@ -3040,8 +3072,21 @@ local Library do
             Items["RealSlider"]:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Slider.Sliding = true
-                    local SizeX = (Input.Position.X - Items["RealSlider"].Instance.AbsolutePosition.X) / Items["RealSlider"].Instance.AbsoluteSize.X
-                    Slider:Set(((Slider.Max - Slider.Min) * SizeX) + Slider.Min)
+                    local RealSliderSizeX = Items["RealSlider"].Instance.AbsoluteSize.X
+                    local SizeX = 0
+                    
+                    if RealSliderSizeX > 0 then
+                        SizeX = (Input.Position.X - Items["RealSlider"].Instance.AbsolutePosition.X) / RealSliderSizeX
+                    end
+                    
+                    if SizeX ~= SizeX or SizeX == math.huge or SizeX == -math.huge then
+                        SizeX = 0
+                    else
+                        SizeX = MathClamp(SizeX, 0, 1)
+                    end
+
+                    local Value = ((Slider.Max - Slider.Min) * SizeX) + Slider.Min
+                    Slider:Set(Value)
 
                     if InputChanged then return end
                     InputChanged = Input.Changed:Connect(function()
@@ -3056,8 +3101,21 @@ local Library do
 
             Library:Connect(UserInputService.InputChanged, function(Input)
                 if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and Slider.Sliding then
-                    local SizeX = (Input.Position.X - Items["RealSlider"].Instance.AbsolutePosition.X) / Items["RealSlider"].Instance.AbsoluteSize.X
-                    Slider:Set(((Slider.Max - Slider.Min) * SizeX) + Slider.Min)
+                    local RealSliderSizeX = Items["RealSlider"].Instance.AbsoluteSize.X
+                    local SizeX = 0
+                    
+                    if RealSliderSizeX > 0 then
+                        SizeX = (Input.Position.X - Items["RealSlider"].Instance.AbsolutePosition.X) / RealSliderSizeX
+                    end
+                    
+                    if SizeX ~= SizeX or SizeX == math.huge or SizeX == -math.huge then
+                        SizeX = 0
+                    else
+                        SizeX = MathClamp(SizeX, 0, 1)
+                    end
+
+                    local Value = ((Slider.Max - Slider.Min) * SizeX) + Slider.Min
+                    Slider:Set(Value)
                 end
             end)
 
