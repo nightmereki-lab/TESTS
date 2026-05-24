@@ -1265,12 +1265,12 @@ local Library do
                     return
                 end
 
-                HueChanged = Input.Changed:Connect(function()
+                BronzeChanged = Input.Changed:Connect(function()
                     if Input.UserInputState == Enum.UserInputState.End then
                         SlidingHue = false
 
-                        HueChanged:Disconnect()
-                        HueChanged = nil
+                        BronzeChanged:Disconnect()
+                        BronzeChanged = nil
                     end
                 end)
             end
@@ -2358,7 +2358,7 @@ end)
 
             local function performSearch(query)
                 for _, child in SearchScroll.Instance:GetChildren() do
-                    if child:IsA("Frame") or child:IsA("TextLabel") then
+                    if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") then
                         child:Destroy()
                     end
                 end
@@ -2394,102 +2394,116 @@ end)
                 end
 
                 for _, match in ipairs(matches) do
-                    local itemFrame = Instances:Create("Frame", {
+                    -- Toda a linha agora é um botão para redirecionar o usuário
+                    local itemButton = Instances:Create("TextButton", {
                         Parent = SearchScroll.Instance,
                         Size = UDim2New(1, -6, 0, 42),
                         BackgroundColor3 = Library.Theme["Element"],
                         BorderSizePixel = 0,
+                        Text = "",
+                        AutoButtonColor = false,
                         ZIndex = 503
                     }):AddToTheme({BackgroundColor3 = 'Element'})
 
                     Instances:Create("UICorner", {
-                        Parent = itemFrame.Instance,
+                        Parent = itemButton.Instance,
                         CornerRadius = UDimNew(0, 6)
                     })
 
                     local itemStroke = Instances:Create("UIStroke", {
-                        Parent = itemFrame.Instance,
+                        Parent = itemButton.Instance,
                         Color = Library.Theme["Outline"],
                         Thickness = 1,
                         ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                     }):AddToTheme({Color = 'Outline'})
 
+                    -- Ícone correspondente à página na esquerda
+                    local pageIcon = Instances:Create("ImageLabel", {
+                        Parent = itemButton.Instance,
+                        Size = UDim2New(0, 18, 0, 18),
+                        Position = UDim2New(0, 10, 0.5, -9),
+                        BackgroundTransparency = 1,
+                        Image = match.Page.Icon,
+                        ImageColor3 = Library.Theme["Text"],
+                        BorderSizePixel = 0,
+                        ZIndex = 504
+                    }):AddToTheme({ImageColor3 = 'Text'})
+
+                    -- Texto explicativo mostrando o caminho [Página > Seção] Nome da Função
                     local pathText = string.format("[%s > %s]", match.Page.Name, match.Section.Name)
                     local infoLabel = Instances:Create("TextLabel", {
-                        Parent = itemFrame.Instance,
+                        Parent = itemButton.Instance,
                         FontFace = Library.Font,
-                        Text = string.format("%s <font color='rgb(160, 160, 160)'>%s</font>", match.Name, pathText),
+                        Text = string.format("%s <font color='rgb(150, 150, 150)'>%s</font>", match.Name, pathText),
                         TextColor3 = Library.Theme["Text"],
                         TextSize = 14,
                         RichText = true,
-                        Size = UDim2New(0.7, 0, 1, 0),
-                        Position = UDim2New(0, 10, 0, 0),
+                        Size = UDim2New(1, -70, 1, 0),
+                        Position = UDim2New(0, 36, 0, 0),
                         BackgroundTransparency = 1,
                         TextXAlignment = Enum.TextXAlignment.Left,
                         ZIndex = 504
                     }):AddToTheme({TextColor3 = 'Text'})
 
-                    local actionButton = Instances:Create("TextButton", {
-                        Parent = itemFrame.Instance,
-                        Size = UDim2New(0, 80, 0, 26),
-                        Position = UDim2New(1, -90, 0.5, -13),
-                        BackgroundColor3 = Library.Theme["Accent"],
-                        Text = "",
-                        ZIndex = 504
-                    }):AddToTheme({BackgroundColor3 = 'Accent'})
-
-                    Instances:Create("UICorner", {
-                        Parent = actionButton.Instance,
-                        CornerRadius = UDimNew(0, 4)
-                    })
-
-                    local actionText = Instances:Create("TextLabel", {
-                        Parent = actionButton.Instance,
+                    -- Indicador de seta à direita demonstrando link de navegação
+                    local arrowLabel = Instances:Create("TextLabel", {
+                        Parent = itemButton.Instance,
                         FontFace = Library.Font,
-                        Text = "Interact",
-                        TextColor3 = FromRGB(255, 255, 255),
-                        TextSize = 12,
-                        Size = UDim2New(1, 0, 1, 0),
+                        Text = "→",
+                        TextColor3 = Library.Theme["Accent"],
+                        TextSize = 16,
+                        Size = UDim2New(0, 30, 1, 0),
+                        Position = UDim2New(1, -40, 0, 0),
                         BackgroundTransparency = 1,
-                        ZIndex = 505
-                    })
+                        TextXAlignment = Enum.TextXAlignment.Right,
+                        ZIndex = 504
+                    }):AddToTheme({TextColor3 = 'Accent'})
 
-                    if match.Type == "Toggle" then
-                        actionText.Instance.Text = match.Element:Get() and "On" or "Off"
-                        actionButton:ChangeItemTheme({BackgroundColor3 = match.Element:Get() and "Accent" or "Element"})
-                    elseif match.Type == "Button" then
-                        actionText.Instance.Text = "Click"
-                    elseif match.Type == "Slider" then
-                        actionText.Instance.Text = tostring(match.Element:Get())
-                    else
-                        actionText.Instance.Text = "Go to"
-                    end
+                    -- Efeito suave de hover ao passar o mouse por cima
+                    local elemColor = Library.Theme["Element"]
+                    local hoverColor = Color3.fromRGB(
+                        math.min(elemColor.R * 255 + 12, 255),
+                        math.min(elemColor.G * 255 + 12, 255),
+                        math.min(elemColor.B * 255 + 12, 255)
+                    )
 
-                    actionButton:Connect("MouseButton1Click", function()
-                        if match.Type == "Toggle" then
-                            match.Element:Set(not match.Element:Get())
-                            actionText.Instance.Text = match.Element:Get() and "On" or "Off"
-                            actionButton:ChangeItemTheme({BackgroundColor3 = match.Element:Get() and "Accent" or "Element"})
-                        elseif match.Type == "Button" then
-                            match.Element:Press()
-                        elseif match.Type == "Slider" or match.Type == "Dropdown" or match.Type == "Textbox" then
-                            for _, p in ipairs(Window.Pages) do
-                                p:Turn(p == match.Page)
-                            end
-                            setSearchOpen(false)
-                            Items["SearchInput"].Instance.Text = ""
-                            
-                            -- Efeito temporário de destaque na seção alvo
-                            local originalOutlineColor = match.Section.Items["SectionOutline"].Instance.BackgroundColor3
-                            match.Section.Items["SectionOutline"].Instance.BackgroundColor3 = Library.Theme["Accent"]
-                            task.delay(1, function()
-                                match.Section.Items["SectionOutline"].Instance.BackgroundColor3 = originalOutlineColor
-                            end)
-                        else
-                            for _, p in ipairs(Window.Pages) do
-                                p:Turn(p == match.Page)
-                            end
+                    itemButton:Connect("MouseEnter", function()
+                        TweenService:Create(itemButton.Instance, TweenInfo.new(0.15), {
+                            BackgroundColor3 = hoverColor
+                        }):Play()
+                    end)
+
+                    itemButton:Connect("MouseLeave", function()
+                        TweenService:Create(itemButton.Instance, TweenInfo.new(0.15), {
+                            BackgroundColor3 = Library.Theme["Element"]
+                        }):Play()
+                    end)
+
+                    -- Ao clicar: Leva você direto para a página e destaca a seção com a cor do tema
+                    itemButton:Connect("MouseButton1Click", function()
+                        -- 1. Redireciona para a aba correta
+                        for _, p in ipairs(Window.Pages) do
+                            p:Turn(p == match.Page)
                         end
+
+                        -- 2. Fecha a busca e limpa o campo de texto
+                        setSearchOpen(false)
+                        Items["SearchInput"].Instance.Text = ""
+
+                        -- 3. Faz o Outline da Seção piscar para chamar sua atenção
+                        local sectionOutline = match.Section.Items["SectionOutline"].Instance
+                        local originalColor = sectionOutline.BackgroundColor3
+
+                        TweenService:Create(sectionOutline, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                            BackgroundColor3 = Library.Theme["Accent"]
+                        }):Play()
+
+                        task.delay(1, function()
+                            TweenService:Create(sectionOutline, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                                BackgroundThickness = 0,
+                                BackgroundColor3 = originalColor
+                            }):Play()
+                        end)
                     end)
                 end
             end
@@ -2867,6 +2881,135 @@ end)
 
             TableInsert(Page.Window.Pages, Page)
             return setmetatable(Page, Library.Pages)
+        end
+
+        local OriginalSectionFunction = Library.Pages.Section
+        Library.Pages.Section = function(self, Data)
+            Data = Data or { }
+
+            local Section = {
+                Window = self.Window,
+                Page = self,
+
+                Name = Data.Name or Data.name or "Section",
+                Side = Data.Side or Data.side or 1,
+                Icon = Data.Icon or Data.icon or "rbxassetid://127136375066593",
+
+                Items = { }
+            }
+
+            local Items = { } do
+                Items["SectionOutline"] = Instances:Create("Frame", {
+                    Parent = Section.Page.Items["Column"].Instance,
+                    Name = "\0",
+                    Size = UDim2New(1, 0, 0, 50),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    BorderSizePixel = 0,
+                    AutomaticSize = Enum.AutomaticSize.Y,
+                    BackgroundColor3 = Library.Theme["Outline"]
+                }):AddToTheme({BackgroundColor3 = 'Outline'})
+                
+                Instances:Create("UICorner", {
+                    Parent = Items["SectionOutline"].Instance,
+                    Name = "\0"
+                })
+                
+                Items["Section"] = Instances:Create("Frame", {
+                    Parent = Items["SectionOutline"].Instance,
+                    Name = "\0",
+                    Position = UDim2New(0, 1, 0, 1),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Size = UDim2New(1, -2, 1, -2),
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = Library.Theme["Inline"]
+                }):AddToTheme({BackgroundColor3 = 'Inline'})
+                
+                Instances:Create("UICorner", {
+                    Parent = Items["Section"].Instance,
+                    Name = "\0"
+                })
+                
+                Items["Top"] = Instances:Create("Frame", {
+                    Parent = Items["Section"].Instance,
+                    Name = "\0",
+                    BackgroundTransparency = 1,
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Size = UDim2New(1, 0, 0, 40),
+                    BorderSizePixel = 0
+                })
+                
+                Items["Text"] = Instances:Create("TextLabel", {
+                    Parent = Items["Top"].Instance,
+                    Name = "\0",
+                    FontFace = Library.Font,
+                    TextWrapped = true,
+                    TextColor3 = Library.Theme["Text"],
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Text = Section.Name,
+                    Size = UDim2New(0, 0, 0, 14),
+                    AnchorPoint = Vector2New(0, 0.5),
+                    BorderSizePixel = 0,
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 40, 0.5, -2),
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    TextSize = 16
+                }):AddToTheme({TextColor3 = 'Text'})
+                
+                Instances:Create("Frame", {
+                    Parent = Items["Top"].Instance,
+                    Name = "\0",
+                    AnchorPoint = Vector2New(0, 1),
+                    Position = UDim2New(0, 0, 1, 0),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Size = UDim2New(1, 0, 0, 1),
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = Library.Theme["Outline"]
+                }):AddToTheme({BackgroundColor3 = 'Outline'})
+                
+                Items["Icon"] = Instances:Create("ImageLabel", {
+                    Parent = Items["Top"].Instance,
+                    Name = "\0",
+                    ImageColor3 = Library.Theme["Text"],
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    AnchorPoint = Vector2New(0, 0.5),
+                    Image = Section.Icon,
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 10, 0.5, 0),
+                    Size = UDim2New(0, 18, 0, 18),
+                    BorderSizePixel = 0
+                }):AddToTheme({ImageColor3 = 'Text'})
+                
+                Items["Content"] = Instances:Create("Frame", {
+                    Parent = Items["Section"].Instance,
+                    Name = "\0",
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 0, 0, 40),
+                    Size = UDim2New(1, 0, 0, 0),
+                    BorderSizePixel = 0,
+                    AutomaticSize = Enum.AutomaticSize.Y
+                })
+                
+                Instances:Create("UIPadding", {
+                    Parent = Items["Content"].Instance,
+                    Name = "\0",
+                    PaddingTop = UDimNew(0, 6),
+                    PaddingBottom = UDimNew(0, 10),
+                    PaddingRight = UDimNew(0, 10),
+                    PaddingLeft = UDimNew(0, 10)
+                })
+                
+                Instances:Create("UIListLayout", {
+                    Parent = Items["Content"].Instance,
+                    Name = "\0",
+                    Padding = UDimNew(0, 6),
+                    SortOrder = Enum.SortOrder.LayoutOrder
+                })                
+                
+                Section.Items = Items
+            end
+
+            return setmetatable(Section, Library.Sections)
         end
 
         local OriginalSectionFunction = Library.Pages.Section
