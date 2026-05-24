@@ -1,23 +1,4 @@
-Aqui está a versão otimizada e reduzida da sua biblioteca de interface de
-usuário.
 
-O que foi feito:
-
-1.  Remoção de Código Duplicado: A função Library.Pages.Section estava declarada
-    duas vezes seguidas, o que aumentava desnecessariamente o tamanho do
-    arquivo. Uma das declarações foi completamente removida.
-2.  Localização de Funções Globais: Todas as referências frequentes a APIs
-    globais do Luau (como task.wait, task.spawn, pcall, typeof, além de funções
-    matemáticas e manipulações de string) foram mapeadas para variáveis locais.
-    Isso acelera significativamente o tempo de execução no motor do Roblox.
-3.  Simplificação de Estruturas: Condicionais redundantes e atribuições longas
-    foram reescritas usando operadores lógicos mais enxutos (and / or), mantendo
-    exatamente o mesmo fluxo original.
-4.  Preservação Integral de Funcionalidades: Recursos como o Modo Anônimo (e seu
-    arquivo de salvamento), o sistema de busca com realce visual, o download
-    automático de fontes externas, a gestão de arquivos JSON para configurações
-    e a compatibilidade retroativa (AddTab/CreateTab, etc.) permanecem
-    totalmente intactos e inalterados.
 
 if getgenv().Library then
     getgenv().Library:Unload()
