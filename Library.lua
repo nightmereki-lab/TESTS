@@ -1,5 +1,3 @@
-
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -233,7 +231,7 @@ local Library do
             local OldTransparency = Item[Property]
             Item[Property] = Visibility and 1 or OldTransparency
 
-            local NewTween = Tween:FadeItem(Item, Property, Visibility, Speed) or Tween:Create(Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {
+            local NewTween = Tween:Create(Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {
                 [Property] = Visibility and OldTransparency or 1
             }, true)
 
@@ -530,7 +528,6 @@ local Library do
         getgenv().Library = nil
     end
 
-    -- Corrigido para lidar com Float = 0 de forma segura (Lua avalia 0 como verdadeiro)
     Library.Round = function(self, Number, Float)
         if not Float or Float <= 0 then
             return MathFloor(Number + 0.5)
@@ -2882,7 +2879,6 @@ local Library do
             return Button
         end
 
-        -- Slider completamento reestruturado sem bugs de NaN, com transições visuais e suporte a scroll do mouse/digitação manual
         Library.Sections.Slider = function(self, Data)
             Data = Data or {}
 
@@ -2902,7 +2898,6 @@ local Library do
                 Sliding = false
             }
 
-            -- Função de arredondamento interna de alta precisão que protege contra NaN de forma isolada
             local function SafeRound(Number, Float)
                 if Number ~= Number or typeof(Number) ~= "number" then return 0 end
                 if not Float or Float <= 0 then
