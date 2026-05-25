@@ -233,7 +233,7 @@ local Library do
             local OldTransparency = Item[Property]
             Item[Property] = Visibility and 1 or OldTransparency
 
-            local NewTween = Tween:Create(Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {
+            local NewTween = Tween:FadeItem(Item, Property, Visibility, Speed) or Tween:Create(Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {
                 [Property] = Visibility and OldTransparency or 1
             }, true)
 
@@ -530,8 +530,12 @@ local Library do
         getgenv().Library = nil
     end
 
+    -- Corrigido para lidar com Float = 0 de forma segura (Lua avalia 0 como verdadeiro)
     Library.Round = function(self, Number, Float)
-        local Multiplier = 1 / (Float or 1)
+        if not Float or Float <= 0 then
+            return MathFloor(Number + 0.5)
+        end
+        local Multiplier = 1 / Float
         return MathFloor(Number * Multiplier) / Multiplier
     end
 
@@ -2878,6 +2882,7 @@ local Library do
             return Button
         end
 
+        -- Slider completamento reestruturado sem bugs de NaN, com transições visuais e suporte a scroll do mouse/digitação manual
         Library.Sections.Slider = function(self, Data)
             Data = Data or {}
 
@@ -2891,11 +2896,24 @@ local Library do
                 Default = Data.Default or Data.default or 0,
                 Max = Data.Max or Data.max or 100,
                 Suffix = Data.Suffix or Data.suffix or "",
-                Decimals = Data.Decimals or Data.decimals or 1,
+                Decimals = Data.Decimals or Data.decimals or 0,
                 Callback = Data.Callback or Data.callback or function() end,
                 Value = 0,
                 Sliding = false
             }
+
+            -- Função de arredondamento interna de alta precisão que protege contra NaN de forma isolada
+            local function SafeRound(Number, Float)
+                if Number ~= Number or typeof(Number) ~= "number" then return 0 end
+                if not Float or Float <= 0 then
+                    return MathFloor(Number + 0.5)
+                end
+                local Multiplier = 1 / Float
+                if Multiplier == math.huge or Multiplier ~= Multiplier then
+                    return MathFloor(Number + 0.5)
+                end
+                return MathFloor(Number * Multiplier + 0.5) / Multiplier
+            end
 
             local Items = {} do 
                 Items["Slider"] = Instances:Create("Frame", {
@@ -2928,8 +2946,8 @@ local Library do
                     Text = "",
                     AutoButtonColor = false,
                     AnchorPoint = Vector2New(1, 0.5),
-                    Position = UDim2New(1, -40, 0.5, 0),
-                    Size = UDim2New(0, 200, 0, 9),
+                    Position = UDim2New(1, -55, 0.5, 0),
+                    Size = UDim2New(0, 185, 0, 9),
                     Selectable = false,
                     BorderSizePixel = 0,
                     BackgroundColor3 = Library.Theme["Element"]
@@ -2940,7 +2958,7 @@ local Library do
                     CornerRadius = UDimNew(0, 6)
                 })
                 
-                Instances:Create("UIStroke", {
+                Items["Stroke"] = Instances:Create("UIStroke", {
                     Parent = Items["RealSlider"].Instance,
                     Color = Library.Theme["Outline"],
                     ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -3005,21 +3023,23 @@ local Library do
                     SliceCenter = RectNew(Vector2New(21, 21), Vector2New(79, 79))
                 }):AddToTheme({ImageColor3 = 'Accent'})
                 
-                Items["Value"] = Instances:Create("TextLabel", {
+                Items["Value"] = Instances:Create("TextBox", {
                     Parent = Items["Slider"].Instance,
                     FontFace = Library.Font,
                     TextColor3 = Library.Theme["Text"],
                     TextTransparency = 0.5,
-                    Text = "50%",
-                    Size = UDim2New(0, 0, 0, 15),
+                    Text = "0",
+                    Size = UDim2New(0, 45, 0, 15),
                     AnchorPoint = Vector2New(1, 0.5),
                     BorderSizePixel = 0,
                     BackgroundTransparency = 1,
                     Position = UDim2New(1, 0, 0.5, 0),
                     BorderColor3 = FromRGB(0, 0, 0),
-                    AutomaticSize = Enum.AutomaticSize.X,
-                    TextSize = 16
-                }):AddToTheme({TextColor3 = 'Text'})                
+                    TextSize = 16,
+                    TextXAlignment = Enum.TextXAlignment.Right,
+                    ClearTextOnFocus = false,
+                    MultiLine = false
+                }):AddToTheme({TextColor3 = 'Text'})              
             end
 
             function Slider:Get() return Slider.Value end
@@ -3029,21 +3049,50 @@ local Library do
             end
 
             function Slider:Set(Value)
-                Slider.Value = Library:Round(MathClamp(Value, Slider.Min, Slider.Max), Slider.Decimals)
+                local numValue = tonumber(Value)
+                if not numValue or numValue ~= numValue then 
+                    numValue = Slider.Min 
+                end
+
+                local range = Slider.Max - Slider.Min
+                if range <= 0 then range = 1 end
+
+                Slider.Value = SafeRound(MathClamp(numValue, Slider.Min, Slider.Max), Slider.Decimals)
+                
+                if Slider.Value ~= Slider.Value then 
+                    Slider.Value = Slider.Min 
+                end
+                
                 Library.Flags[Slider.Flag] = Slider.Value
 
-                Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2New((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1, 0)})
-                Items["Value"].Instance.Text = StringFormat("%s%s", Slider.Value, Slider.Suffix)
+                local scale = (Slider.Value - Slider.Min) / range
+                if scale ~= scale then scale = 0 end
+
+                Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2New(scale, 0, 1, 0)})
+                
+                if not Items["Value"].Instance:IsFocused() then
+                    Items["Value"].Instance.Text = StringFormat("%s%s", Slider.Value, Slider.Suffix)
+                end
 
                 if Slider.Callback then Library:SafeCall(Slider.Callback, Slider.Value) end
+            end
+
+            local function UpdateFromInput(Input)
+                local absoluteSizeX = Items["RealSlider"].Instance.AbsoluteSize.X
+                if absoluteSizeX <= 0 then return end 
+
+                local rawSizeX = (Input.Position.X - Items["RealSlider"].Instance.AbsolutePosition.X) / absoluteSizeX
+                if rawSizeX ~= rawSizeX then rawSizeX = 0 end
+
+                local SizeX = MathClamp(rawSizeX, 0, 1)
+                Slider:Set(((Slider.Max - Slider.Min) * SizeX) + Slider.Min)
             end
 
             local InputChanged 
             Items["RealSlider"]:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Slider.Sliding = true
-                    local SizeX = (Input.Position.X - Items["RealSlider"].Instance.AbsolutePosition.X) / Items["RealSlider"].Instance.AbsoluteSize.X
-                    Slider:Set(((Slider.Max - Slider.Min) * SizeX) + Slider.Min)
+                    UpdateFromInput(Input)
 
                     if InputChanged then return end
                     InputChanged = Input.Changed:Connect(function()
@@ -3058,8 +3107,44 @@ local Library do
 
             Library:Connect(UserInputService.InputChanged, function(Input)
                 if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and Slider.Sliding then
-                    local SizeX = (Input.Position.X - Items["RealSlider"].Instance.AbsolutePosition.X) / Items["RealSlider"].Instance.AbsoluteSize.X
-                    Slider:Set(((Slider.Max - Slider.Min) * SizeX) + Slider.Min)
+                    UpdateFromInput(Input)
+                end
+            end)
+
+            Items["RealSlider"]:Connect("MouseWheelForward", function()
+                local Step = (not Slider.Decimals or Slider.Decimals <= 0) and 1 or Slider.Decimals
+                Slider:Set(Slider.Value + Step)
+            end)
+
+            Items["RealSlider"]:Connect("MouseWheelBackward", function()
+                local Step = (not Slider.Decimals or Slider.Decimals <= 0) and 1 or Slider.Decimals
+                Slider:Set(Slider.Value - Step)
+            end)
+
+            Items["RealSlider"]:Connect("MouseEnter", function()
+                Items["Stroke"]:Tween(TweenInfo.new(0.15), {Color = Library.Theme.Accent})
+            end)
+
+            Items["RealSlider"]:Connect("MouseLeave", function()
+                Items["Stroke"]:Tween(TweenInfo.new(0.15), {Color = Library.Theme.Outline})
+            end)
+
+            Items["Value"]:Connect("Focused", function()
+                Items["Value"].Instance.TextTransparency = 0.1
+                local CleanText = Items["Value"].Instance.Text
+                if Slider.Suffix ~= "" then
+                    CleanText = StringGSub(CleanText, Slider.Suffix, "")
+                end
+                Items["Value"].Instance.Text = CleanText
+            end)
+
+            Items["Value"]:Connect("FocusLost", function(EnterPressed)
+                Items["Value"].Instance.TextTransparency = 0.5
+                local TypedValue = tonumber(Items["Value"].Instance.Text)
+                if TypedValue then
+                    Slider:Set(TypedValue)
+                else
+                    Slider:Set(Slider.Value) 
                 end
             end)
 
