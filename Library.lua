@@ -765,7 +765,12 @@ local Library do
     Library.TriggerAutoSave = function(self)
         if self.IsLoadingConfig then return end
         if not self.AutoSaveEnabled then return end
-        if not self.CurrentConfig or self.CurrentConfig == "" then return end
+        
+        -- Garante a existência do arquivo/nome caso nenhum esteja selecionado
+        if not self.CurrentConfig or self.CurrentConfig == "" then
+            self.CurrentConfig = "autosave"
+            self:SaveGlobalSettings()
+        end
         
         if self.AutoSaveThread then
             task.cancel(self.AutoSaveThread)
@@ -2986,7 +2991,7 @@ local Library do
                     return MathFloor(Number + 0.5)
                 end
                 local Multiplier = 1 / Float
-                if Multiplier == math.huge or Multiplier ~= Multiplier then
+                if Multiplier == math.huge or Multiplier ~= MathFloor(Multiplier) and Multiplier ~= Multiplier then
                     return MathFloor(Number + 0.5)
                 end
                 return MathFloor(Number * Multiplier + 0.5) / Multiplier
@@ -3989,6 +3994,20 @@ local Library do
                         Library.AutoSaveEnabled = Value
                         Library:SaveGlobalSettings()
                         if Value then
+                            -- Se não houver arquivo ativo definido, cria o 'autosave.json'
+                            if not Library.CurrentConfig or Library.CurrentConfig == "" then
+                                Library.CurrentConfig = "autosave"
+                                Library:SaveGlobalSettings()
+                            end
+                            
+                            local Path = Library.Folders.Configs .. "/" .. Library.CurrentConfig .. ".json"
+                            if not isfile(Path) then
+                                pcall(writefile, Path, Library:GetConfig())
+                            end
+                            
+                            -- Recarrega a lista para mostrar o novo arquivo criado e o seleciona
+                            Library:RefreshConfigsList(ConfigsDropdown)
+                            ConfigsDropdown:Set(Library.CurrentConfig)
                             Library:TriggerAutoSave()
                         end
                     end
