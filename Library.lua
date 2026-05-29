@@ -1,3 +1,5 @@
+
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -91,12 +93,34 @@ local Library do
         Holder = nil,
         NotifHolder = nil,
         UnusedHolder = nil,
-        Font = nil
+        Font = nil,
+        AutoSaveEnabled = false,
+        CurrentConfig = "",
+        IsLoadingConfig = false,
+        AutoSaveThread = nil
     }
 
     Library.__index = Library
     Library.Sections.__index = Library.Sections
     Library.Pages.__index = Library.Pages
+
+    -- Proxy para interceptar as mudanças de flags de maneira otimizada
+    local FlagsRaw = {}
+    Library.Flags = setmetatable({}, {
+        __index = FlagsRaw,
+        __newindex = function(t, k, v)
+            rawset(FlagsRaw, k, v)
+            if Library.TriggerAutoSave then
+                Library:TriggerAutoSave()
+            end
+        end,
+        __pairs = function()
+            return pairs(FlagsRaw)
+        end,
+        __len = function()
+            return #FlagsRaw
+        end
+    })
 
     local Keys = {
         ["Unknown"]           = "Unknown",
@@ -210,7 +234,6 @@ local Library do
         end
 
         Tween.GetProperty = function(self, Item)
-            Item = Item or self.Item 
             if Item:IsA("Frame") then
                 return { "BackgroundTransparency" }
             elseif Item:IsA("TextLabel") or Item:IsA("TextButton") then
@@ -628,6 +651,7 @@ local Library do
 
     Library.LoadConfig = function(self, Config)
         local Decoded = HttpService:JSONDecode(Config)
+        self.IsLoadingConfig = true 
         local Success, Result = Library:SafeCall(function()
             for Index, Value in pairs(Decoded) do 
                 local SetFunction = Library.SetFlags[Index]
@@ -642,6 +666,7 @@ local Library do
                 end
             end
         end)
+        self.IsLoadingConfig = false 
         return Success, Result
     end
 
@@ -714,6 +739,63 @@ local Library do
         local Bottom = Top + Object.AbsoluteSize 
         return Library:CompareVectors(Top, BoundryTop) or Library:CompareVectors(BoundryBottom, Bottom)
     end
+
+    -- Gerenciamento de Persistência Global e Auto-Salvamento
+    Library.SaveGlobalSettings = function(self)
+        local Data = {
+            AutoSaveEnabled = self.AutoSaveEnabled,
+            CurrentConfig = self.CurrentConfig
+        }
+        pcall(writefile, "homxiide/global_settings.json", HttpService:JSONEncode(Data))
+    end
+
+    Library.LoadGlobalSettings = function(self)
+        local Path = "homxiide/global_settings.json"
+        if isfile(Path) then
+            local Success, Result = pcall(function()
+                return HttpService:JSONDecode(readfile(Path))
+            end)
+            if Success and Result then
+                self.AutoSaveEnabled = Result.AutoSaveEnabled or false
+                self.CurrentConfig = Result.CurrentConfig or ""
+            end
+        end
+    end
+
+    Library.TriggerAutoSave = function(self)
+        if self.IsLoadingConfig then return end
+        if not self.AutoSaveEnabled then return end
+        if not self.CurrentConfig or self.CurrentConfig == "" then return end
+        
+        if self.AutoSaveThread then
+            task.cancel(self.AutoSaveThread)
+        end
+        
+        self.AutoSaveThread = task.delay(0.5, function()
+            if self.CurrentConfig and self.CurrentConfig ~= "" then
+                local Path = self.Folders.Configs .. "/" .. self.CurrentConfig .. ".json"
+                pcall(writefile, Path, self:GetConfig())
+            end
+            self.AutoSaveThread = nil
+        end)
+    end
+
+    Library.AutoLoadLastConfig = function(self, DropdownElement)
+        if self.AutoSaveEnabled and self.CurrentConfig and self.CurrentConfig ~= "" then
+            local Path = self.Folders.Configs .. "/" .. self.CurrentConfig .. ".json"
+            if isfile(Path) then
+                task.spawn(function()
+                    task_wait(0.5)
+                    self:LoadConfig(readfile(Path))
+                    if DropdownElement then
+                        DropdownElement:Set(self.CurrentConfig)
+                    end
+                end)
+            end
+        end
+    end
+
+    Library:LoadGlobalSettings()
 
     Library.CreateColorpicker = function(self, Data)
         local Colorpicker = {
@@ -3831,7 +3913,11 @@ local Library do
                     Items = {}, 
                     Multi = false,
                     MaxSize = 120,
-                    Callback = function(Value) ConfigSelected = Value end
+                    Callback = function(Value) 
+                        ConfigSelected = Value 
+                        Library.CurrentConfig = Value
+                        Library:SaveGlobalSettings()
+                    end
                 })
     
                 ConfigsSection:Textbox({
@@ -3858,6 +3944,8 @@ local Library do
                     Name = "Load",
                     Callback = function()
                         if ConfigSelected and ConfigSelected ~= "" then
+                            Library.CurrentConfig = ConfigSelected
+                            Library:SaveGlobalSettings()
                             Library:LoadConfig(readfile(Library.Folders.Configs .. "/" .. ConfigSelected..".json"))
                         end
                     end
@@ -3867,6 +3955,8 @@ local Library do
                     Name = "Save",
                     Callback = function()
                         if ConfigSelected and ConfigSelected ~= "" then
+                            Library.CurrentConfig = ConfigSelected
+                            Library:SaveGlobalSettings()
                             writefile(Library.Folders.Configs .. "/" .. ConfigSelected..".json", Library:GetConfig())
                         end
                     end
@@ -3877,6 +3967,10 @@ local Library do
                     Callback = function()
                         if ConfigSelected and ConfigSelected ~= "" then
                             delfile(Library.Folders.Configs .. "/" .. ConfigSelected..".json")
+                            if Library.CurrentConfig == ConfigSelected then
+                                Library.CurrentConfig = ""
+                                Library:SaveGlobalSettings()
+                            end
                             Library:RefreshConfigsList(ConfigsDropdown)
                         end
                     end
@@ -3886,8 +3980,22 @@ local Library do
                     Name = "Refresh",
                     Callback = function() Library:RefreshConfigsList(ConfigsDropdown) end
                 })
+
+                ConfigsSection:Toggle({
+                    Name = "Auto Save",
+                    Flag = "AutoSaveEnabled_Settings",
+                    Default = Library.AutoSaveEnabled,
+                    Callback = function(Value)
+                        Library.AutoSaveEnabled = Value
+                        Library:SaveGlobalSettings()
+                        if Value then
+                            Library:TriggerAutoSave()
+                        end
+                    end
+                })
     
                 Library:RefreshConfigsList(ConfigsDropdown)
+                Library:AutoLoadLastConfig(ConfigsDropdown)
             end
         end
         return SettingsPage
