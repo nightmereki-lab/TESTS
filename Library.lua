@@ -4027,6 +4027,7 @@ Library.Sections.CreateLabel = Library.Sections.Label
 local function NormalizeNamedData(NameOrData, Icon)
     if type(NameOrData) == "table" then
         local Data = TableClone(NameOrData)
+        local Data = table.clone(NameOrData)
         if Data.Title and not (Data.Name or Data.name) then Data.Name = Data.Title end
         if Data.title and not (Data.Name or Data.name) then Data.Name = Data.title end
         if Icon and not (Data.Icon or Data.icon) then Data.Icon = Icon end
