@@ -3291,6 +3291,28 @@ local Library do
                     PaddingRight = UDimNew(0, 10),
                     PaddingLeft = UDimNew(0, 10)
                 })
+
+                Items["SearchBox"] = Instances:Create("TextBox", {
+                    Parent = Items["OptionHolder"].Instance,
+                    FontFace = Library.Font,
+                    TextColor3 = Library.Theme["Text"],
+                    TextTransparency = 0.5,
+                    PlaceholderText = "Search...",
+                    PlaceholderColor3 = FromRGB(133, 139, 143),
+                    TextSize = 14,
+                    Text = "",
+                    Size = UDim2New(1, 0, 0, 24),
+                    BorderSizePixel = 0,
+                    BackgroundTransparency = 0.5,
+                    BackgroundColor3 = Library.Theme["Element"],
+                    LayoutOrder = -1,
+                    ClearTextOnFocus = false
+                }):AddToTheme({TextColor3 = 'Text', BackgroundColor3 = 'Element'})
+
+                Instances:Create("UICorner", {
+                    Parent = Items["SearchBox"].Instance,
+                    CornerRadius = UDimNew(0, 4)
+                })
             end
 
             function Dropdown:Get() return Dropdown.Value end
@@ -3301,6 +3323,18 @@ local Library do
 
             local Debounce = false 
             local RenderStepped 
+
+            local function FilterOptions(query)
+                query = StringLower(query)
+                for _, OptionData in pairs(Dropdown.Options) do
+                    local match = (query == "" or StringFind(StringLower(OptionData.Name), query, 1, true) ~= nil)
+                    OptionData.Button.Instance.Visible = match
+                end
+            end
+
+            Library:Connect(Items["SearchBox"].Instance:GetPropertyChangedSignal("Text"), function()
+                FilterOptions(Items["SearchBox"].Instance.Text)
+            end)
 
             function Dropdown:SetOpen(Bool)
                 if Debounce then return end
@@ -3328,6 +3362,8 @@ local Library do
                         RenderStepped:Disconnect()
                         RenderStepped = nil
                     end
+                    Items["SearchBox"].Instance.Text = ""
+                    FilterOptions("")
                 end
 
                 local Descendants = Items["OptionHolder"].Instance:GetDescendants()
