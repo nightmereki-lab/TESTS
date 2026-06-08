@@ -476,6 +476,10 @@ local Library do
             if not isfile(Data.Id) then 
                 writefile(Data.Id, game:HttpGet(Data.Url))
             end
+            local success = pcall(function()
+                if not isfile(Data.Id) then 
+                    writefile(Data.Id, game:HttpGet(Data.Url))
+                end
 
             local FontData = {
                 name = Name,
@@ -485,12 +489,27 @@ local Library do
                         weight = Weight,
                         style = Style,
                         assetId = getcustomasset(Data.Id)
+                local FontData = {
+                    name = Name,
+                    faces = {
+                        {
+                            name = Name,
+                            weight = Weight,
+                            style = Style,
+                            assetId = getcustomasset(Data.Id)
+                        }
                     }
                 }
             }
+                writefile(StringFormat("%s/%s.font", Library.Folders.Assets, Name), HttpService:JSONEncode(FontData))
+            end)
 
             writefile(StringFormat("%s/%s.font", Library.Folders.Assets, Name), HttpService:JSONEncode(FontData))
             return Font.new(getcustomasset(StringFormat("%s/%s.font", Library.Folders.Assets, Name)))
+            if success then
+                return Font.new(getcustomasset(StringFormat("%s/%s.font", Library.Folders.Assets, Name)))
+            end
+            return Font.fromEnum(Enum.Font.SourceSans) -- Fallback caso o download falhe
         end
 
         Library.Font = CustomFont:New("OutfitMedium", 400, "Regular", {
@@ -502,14 +521,20 @@ local Library do
     Library.Holder = Instances:Create("ScreenGui", {
         Parent = gethui(),
         Name = "\0",
+        Parent = get_ui_parent(),
+        Name = "MidnightLib_UI",
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
         DisplayOrder = 2,
         ResetOnSpawn = false
+        ResetOnSpawn = false,
+        Enabled = true
     })
 
     Library.UnusedHolder = Instances:Create("ScreenGui", {
         Parent = gethui(),
         Name = "\0",
+        Parent = get_ui_parent(),
+        Name = "MidnightLib_Unused",
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
         Enabled = false,
         ResetOnSpawn = false
@@ -2318,6 +2343,13 @@ local Library do
                 task_wait()
                 Items["MainFrame"].Instance.AnchorPoint = Vector2New(0, 0)
                 Items["MainFrame"].Instance.Position = UDim2New(0, CenterPosition.X, 0, CenterPosition.Y)
+                task_wait(0.1) -- Espera um pouco para o Roblox calcular o layout
+                local MainFrame = Items["MainFrame"].Instance
+                if MainFrame.AbsoluteSize.X > 0 then
+                    local CenterPosition = MainFrame.AbsolutePosition
+                    MainFrame.AnchorPoint = Vector2New(0, 0)
+                    MainFrame.Position = UDim2New(0, CenterPosition.X, 0, CenterPosition.Y)
+                end
             end
 
             function Window:SetOpen(Bool)
