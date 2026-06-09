@@ -2402,6 +2402,7 @@ do
 
     -- ALIASES PARA FACILITAR
     function Library:CreateWindow(Data) return self:Window(Data) end
+    function Library:AddPage(Data) return self:Page(Data) end -- Atalho AddPage adicionado
     function Library.Pages:AddSection(Data) return self:Section(Data) end
     function Library.Sections:AddToggle(Data) return self:Toggle(Data) end
     function Library.Sections:AddButton(Data) return self:Button(Data) end
