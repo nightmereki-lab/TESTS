@@ -4,7 +4,8 @@ if getgenv().Library then
     getgenv().Library:Unload()
 end
 
-local Library do 
+local Library
+do 
     local Workspace = game:GetService("Workspace")
     local UserInputService = game:GetService("UserInputService")
     local Players = game:GetService("Players")
@@ -510,7 +511,7 @@ local Library do
         })
     end
 
-    -- POPUP DE BADGES (CORRIGIDO E OTIMIZADO)
+    -- POPUP DE BADGES (CORRIGIDO E OTIMIZADO COM SUPORTE A ZINDEX GLOBAL)
     function Library:CreateInfoPopup(Title, Description, BadgeType)
         local BadgeColor = Library.BadgeColors[BadgeType] or Library.Theme.Accent
         
@@ -531,7 +532,7 @@ local Library do
             Size = UDim2New(0, 340, 0, 200),
             BackgroundColor3 = Library.Theme.Background,
             BorderSizePixel = 0,
-            ZIndex = 10001 -- Mantém acima do overlay na ordem global
+            ZIndex = 10001 -- Força a ficar visível acima do Overlay no modo Global
         })
         Instances:Create("UICorner", { Parent = Container.Instance, CornerRadius = UDimNew(0, 8) })
         Instances:Create("UIStroke", { Parent = Container.Instance, Color = BadgeColor, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Transparency = 0.1 })
@@ -545,7 +546,7 @@ local Library do
             Size = UDim2New(1, 0, 0, 45),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Center,
-            ZIndex = 10002 -- Acima do Container
+            ZIndex = 10002
         })
 
         local Desc = Instances:Create("TextLabel", {
@@ -559,7 +560,7 @@ local Library do
             BackgroundTransparency = 1,
             TextWrapped = true,
             TextYAlignment = Enum.TextYAlignment.Top,
-            ZIndex = 10002 -- Acima do Container
+            ZIndex = 10002
         })
 
         local Close = Instances:Create("TextButton", {
@@ -571,16 +572,16 @@ local Library do
             Size = UDim2New(0, 120, 0, 35),
             Position = UDim2New(0.5, -60, 1, -45),
             BorderSizePixel = 0,
-            ZIndex = 10003 -- Botão de fechar sempre por cima de tudo
+            ZIndex = 10003 -- Botão no topo da hierarquia global para cliques perfeitos
         })
         Instances:Create("UICorner", { Parent = Close.Instance, CornerRadius = UDimNew(0, 6) })
 
-        -- Animação de entrada suave
+        -- Animação de Entrada
         Container.Instance.Size = UDim2New(0, 0, 0, 0)
         TweenService:Create(Overlay.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.65}):Play()
         TweenService:Create(Container.Instance, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 340, 0, 200)}):Play()
 
-        -- Efeito Hover no botão de Fechar
+        -- Hover dinâmico no botão
         Close:Connect("MouseEnter", function()
             TweenService:Create(Close.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BadgeColor:Lerp(Color3.new(1, 1, 1), 0.15)}):Play()
         end)
@@ -2149,7 +2150,7 @@ local Library do
             return setmetatable(Section, Library.Sections)
         end
 
-        -- TOGGLE COM BADGE E LOCK (PROGRAMMATIC SET BYPASS COMPATIBLE)
+        -- TOGGLE COM BADGE E LOCK
         Library.Sections.Toggle = function(self, Data)
             Data = Data or {}
 
@@ -2411,3 +2412,4 @@ local Library do
     getgenv().Library = Library
 end
 
+return Library
