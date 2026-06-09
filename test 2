@@ -1,4 +1,4 @@
---- Library Homxiide Atualizada com Badges e Lock ---
+
 
 if getgenv().Library then
     getgenv().Library:Unload()
@@ -144,7 +144,7 @@ local Library do
         ["Equals"]            = "=",
         ["At"]                = "@",
         ["LeftBracket"]       = "LeftBracket",
-        ["RightBracket"]      = "RightBracked",
+        ["RightBracket"]      = "RightBracket",
         ["BackSlash"]         = "BackSlash",
         ["Caret"]             = "^",
         ["Underscore"]        = "_",
@@ -167,11 +167,11 @@ local Library do
         ["KeypadNine"]        = "Keypad9",
         ["KeypadPeriod"]      = "KeypadP",
         ["KeypadDivide"]      = "KeypadD",
-        ["KeypadMultiply"]    = "KeypadM",
-        ["KeypadMinus"]       = "KeypadM",
-        ["KeypadPlus"]        = "KeypadP",
-        ["KeypadEnter"]       = "KeypadE",
-        ["KeypadEquals"]      = "KeypadE",
+        ["KeypadMultiply"]    = "KeypadMultiply",
+        ["KeypadMinus"]       = "KeypadMinus",
+        ["KeypadPlus"]        = "KeypadPlus",
+        ["KeypadEnter"]       = "KeypadEnter",
+        ["KeypadEquals"]      = "KeypadEquals",
         ["Insert"]            = "Insert",
         ["Home"]              = "Home",
         ["PageUp"]            = "PageUp",
@@ -335,11 +335,11 @@ local Library do
                 local NewX = StartPosition.X.Offset + DragDelta.X
                 local NewY = StartPosition.Y.Offset + DragDelta.Y
 
-                local ScreenSize = Gui.Parent.AbsoluteSize
+                local ParentSize = (Gui.Parent and (Gui.Parent:IsA("GuiObject") or Gui.Parent:IsA("LayerCollector"))) and Gui.Parent.AbsoluteSize or Camera.ViewportSize
                 local GuiSize = Gui.AbsoluteSize
         
-                NewX = MathClamp(NewX, 0, ScreenSize.X - GuiSize.X)
-                NewY = MathClamp(NewY, 0, ScreenSize.Y - GuiSize.Y)
+                NewX = MathClamp(NewX, 0, ParentSize.X - GuiSize.X)
+                NewY = MathClamp(NewY, 0, ParentSize.Y - GuiSize.Y)
         
                 self:Tween(TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, NewX, 0, NewY)})
             end
@@ -603,6 +603,18 @@ local Library do
             AutoButtonColor = true
         })
         Instances:Create("UICorner", { Parent = Badge.Instance, CornerRadius = UDimNew(0, 4) })
+        
+        -- Evento dinâmico para corrigir o posicionamento após a renderização do texto
+        local function updatePos()
+            if Parent and Parent.Parent then
+                Badge.Instance.Position = UDim2New(0, Parent.TextBounds.X + 10, 0.5, -8)
+            end
+        end
+        local textBoundsConnection = Parent:GetPropertyChangedSignal("TextBounds"):Connect(updatePos)
+        Library:Connect(Parent.Destroying, function()
+            textBoundsConnection:Disconnect()
+        end)
+        updatePos()
         
         Badge:Connect("MouseButton1Click", function()
             Library:CreateInfoPopup(Data.Name or "Informação", Data.BadgeDescription or "Este recurso possui a tag "..BType..". Use com cautela.", BType)
@@ -1041,7 +1053,7 @@ local Library do
         function Colorpicker:SlidePalette(Input)
             if not Input or not SlidingPalette then return end
 
-            local ValueX = MathClamp(1 - (Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 1)
+            local ValueX = MathClamp((Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 1)
             local ValueY = MathClamp(1 - (Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 1)
 
             Colorpicker.Saturation = ValueX
@@ -1081,6 +1093,10 @@ local Library do
                 Items["ColorpickerWindow"].Instance.Parent = Library.Holder.Instance
                 
                 RenderStepped = RunService.RenderStepped:Connect(function()
+                    if not Items["ColorpickerButton"].Instance or not Items["ColorpickerButton"].Instance.Parent then
+                        if RenderStepped then RenderStepped:Disconnect() RenderStepped = nil end
+                        return
+                    end
                     Items["ColorpickerWindow"].Instance.Position = UDim2New(
                         0, 
                         Items["ColorpickerButton"].Instance.AbsolutePosition.X, 
@@ -1138,7 +1154,7 @@ local Library do
             end 
 
             Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = Color:ToHSV()
-            local PaletteValueX = MathClamp(1 - Colorpicker.Saturation, 0, 0.955)
+            local PaletteValueX = MathClamp(Colorpicker.Saturation, 0, 0.955)
             local PaletteValueY = MathClamp(1 - Colorpicker.Value, 0, 0.955)
             local SlideY = MathClamp(Colorpicker.Hue, 0, 0.955)
 
@@ -1708,7 +1724,9 @@ local Library do
                         isAnonymous = decoded.Anonymous
                     end
                 else
-                    writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = false}))
+                    pcall(function()
+                        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = false}))
+                    end)
                 end
 
                 local function updateProfileDisplay()
@@ -1799,7 +1817,9 @@ local Library do
 
                     toggleContainer.MouseButton1Click:Connect(function()
                         isAnonymous = not isAnonymous
-                        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = isAnonymous}))
+                        pcall(function()
+                            writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = isAnonymous}))
+                        end)
                         updateProfileDisplay()
 
                         local targetPos = isAnonymous and UDim2New(1, -20, 0.5, -8) or UDim2New(0, 4, 0.5, -8)
@@ -1829,11 +1849,13 @@ local Library do
                 local currentIndex = 1
 
                 Library:Thread(function()
-                    while true do
+                    while Countdown and Countdown.Parent do
                         task_wait(3)
+                        if not (Countdown and Countdown.Parent) then break end
                         currentIndex = currentIndex % #phrases + 1
                         TweenService:Create(Countdown, TweenInfo.new(0.25), {TextTransparency = 1}):Play()
                         task_wait(0.25)
+                        if not (Countdown and Countdown.Parent) then break end
                         Countdown.Text = phrases[currentIndex]
                         TweenService:Create(Countdown, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
                     end
@@ -2191,7 +2213,6 @@ local Library do
             end
 
             function Toggle:Set(Value)
-                if Toggle.Locked then return end
                 Toggle.Value = Value 
                 Library.Flags[Toggle.Flag] = Value 
                 
@@ -2201,7 +2222,10 @@ local Library do
                 Library:SafeCall(Toggle.Callback, Value)
             end
 
-            Items["Toggle"]:Connect("MouseButton1Down", function() Toggle:Set(not Toggle.Value) end)
+            Items["Toggle"]:Connect("MouseButton1Down", function() 
+                if Toggle.Locked then return end
+                Toggle:Set(not Toggle.Value) 
+            end)
             if Toggle.Locked then Toggle:SetLock(true) end
             Toggle:Set(Data.Default or false)
             return Toggle 
