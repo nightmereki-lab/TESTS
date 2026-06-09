@@ -243,7 +243,7 @@ local Library do
             local OldTransparency = Item[Property]
             Item[Property] = Visibility and 1 or OldTransparency
 
-            local NewTween = Tween:Create(Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {
+            local NewTween = Tween.Create(nil, Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {
                 [Property] = Visibility and OldTransparency or 1
             }, true)
 
@@ -309,7 +309,7 @@ local Library do
         end
 
         Instances.Tween = function(self, Info, Goal)
-            if self.Instance then return Tween:Create(self, Info, Goal) end
+            if self.Instance then return Tween.Create(nil, self, Info, Goal) end
         end
 
         Instances.Disconnect = function(self, Name)
@@ -510,14 +510,14 @@ local Library do
         })
     end
 
-    -- POPUP DE BADGES
+    -- POPUP DE BADGES (CORRIGIDO E OTIMIZADO)
     function Library:CreateInfoPopup(Title, Description, BadgeType)
         local BadgeColor = Library.BadgeColors[BadgeType] or Library.Theme.Accent
         
         local Overlay = Instances:Create("TextButton", {
             Parent = Library.Holder.Instance,
             Size = UDim2New(1, 0, 1, 0),
-            BackgroundColor3 = FromRGB(0, 0, 0),
+            BackgroundColor3 = FromRGB(8, 8, 10),
             BackgroundTransparency = 1,
             Text = "",
             AutoButtonColor = false,
@@ -531,9 +531,10 @@ local Library do
             Size = UDim2New(0, 340, 0, 200),
             BackgroundColor3 = Library.Theme.Background,
             BorderSizePixel = 0,
+            ZIndex = 10001 -- Mantém acima do overlay na ordem global
         })
         Instances:Create("UICorner", { Parent = Container.Instance, CornerRadius = UDimNew(0, 8) })
-        Instances:Create("UIStroke", { Parent = Container.Instance, Color = BadgeColor, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
+        Instances:Create("UIStroke", { Parent = Container.Instance, Color = BadgeColor, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Transparency = 0.1 })
 
         local Header = Instances:Create("TextLabel", {
             Parent = Container.Instance,
@@ -543,7 +544,8 @@ local Library do
             TextSize = 18,
             Size = UDim2New(1, 0, 0, 45),
             BackgroundTransparency = 1,
-            TextXAlignment = Enum.TextXAlignment.Center
+            TextXAlignment = Enum.TextXAlignment.Center,
+            ZIndex = 10002 -- Acima do Container
         })
 
         local Desc = Instances:Create("TextLabel", {
@@ -556,7 +558,8 @@ local Library do
             Size = UDim2New(1, -40, 1, -100),
             BackgroundTransparency = 1,
             TextWrapped = true,
-            TextYAlignment = Enum.TextYAlignment.Top
+            TextYAlignment = Enum.TextYAlignment.Top,
+            ZIndex = 10002 -- Acima do Container
         })
 
         local Close = Instances:Create("TextButton", {
@@ -567,14 +570,23 @@ local Library do
             BackgroundColor3 = BadgeColor,
             Size = UDim2New(0, 120, 0, 35),
             Position = UDim2New(0.5, -60, 1, -45),
-            BorderSizePixel = 0
+            BorderSizePixel = 0,
+            ZIndex = 10003 -- Botão de fechar sempre por cima de tudo
         })
         Instances:Create("UICorner", { Parent = Close.Instance, CornerRadius = UDimNew(0, 6) })
 
-        -- Animação
+        -- Animação de entrada suave
         Container.Instance.Size = UDim2New(0, 0, 0, 0)
-        TweenService:Create(Overlay.Instance, TweenInfo.new(0.3), {BackgroundTransparency = 0.5}):Play()
-        TweenService:Create(Container.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Back), {Size = UDim2New(0, 340, 0, 200)}):Play()
+        TweenService:Create(Overlay.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.65}):Play()
+        TweenService:Create(Container.Instance, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 340, 0, 200)}):Play()
+
+        -- Efeito Hover no botão de Fechar
+        Close:Connect("MouseEnter", function()
+            TweenService:Create(Close.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BadgeColor:Lerp(Color3.new(1, 1, 1), 0.15)}):Play()
+        end)
+        Close:Connect("MouseLeave", function()
+            TweenService:Create(Close.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BadgeColor}):Play()
+        end)
 
         Close:Connect("MouseButton1Click", function()
             TweenService:Create(Overlay.Instance, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
@@ -2137,7 +2149,7 @@ local Library do
             return setmetatable(Section, Library.Sections)
         end
 
-        -- TOGGLE COM BADGE E LOCK
+        -- TOGGLE COM BADGE E LOCK (PROGRAMMATIC SET BYPASS COMPATIBLE)
         Library.Sections.Toggle = function(self, Data)
             Data = Data or {}
 
@@ -2253,7 +2265,7 @@ local Library do
 
         Library.Sections.Slider = function(self, Data)
             Data = Data or {}
-            local Slider = {Section = self, Name = Data.Name or "Slider", Min = Data.Min or 0, Max = Data.Max or 100, Value = 0, Flag = Data.Flag or Library:NextFlag(), Callback = Data.Callback or function() end}
+            local Slider = {Section = self, Name = Data.Name or "Slider", Min = Data.Min or 0, Max = Data.Max or 100, Value = Data.Default or 0, Flag = Data.Flag or Library:NextFlag(), Callback = Data.Callback or function() end}
             local Items = {} do 
                 Items["Main"] = Instances:Create("Frame", {Parent = Slider.Section.Items["Content"].Instance, Size = UDim2New(1, 0, 0, 35), BackgroundTransparency = 1})
                 Items["Text"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, Text = Slider.Name, FontFace = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 14, BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 15)})
@@ -2261,23 +2273,50 @@ local Library do
                 Instances:Create("UICorner", {Parent = Items["Bar"].Instance})
                 Items["Fill"] = Instances:Create("Frame", {Parent = Items["Bar"].Instance, Size = UDim2New(0, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent})
                 Instances:Create("UICorner", {Parent = Items["Fill"].Instance})
-                Items["Val"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Text = "0", FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1})
+                Items["Val"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1})
+            end
+
+            local function Set(val)
+                local Clamped = MathClamp(val, Slider.Min, Slider.Max)
+                Slider.Value = Clamped
+                local Perc = (Clamped - Slider.Min) / (Slider.Max - Slider.Min)
+                Items["Fill"].Instance.Size = UDim2New(Perc, 0, 1, 0)
+                Items["Val"].Instance.Text = tostring(Clamped)
+                Library.Flags[Slider.Flag] = Clamped
+                Library:SafeCall(Slider.Callback, Clamped)
             end
 
             local function Update(Input)
                 local Perc = MathClamp((Input.Position.X - Items["Bar"].Instance.AbsolutePosition.X) / Items["Bar"].Instance.AbsoluteSize.X, 0, 1)
-                Slider.Value = MathFloor(Slider.Min + (Slider.Max - Slider.Min) * Perc)
-                Items["Fill"].Instance.Size = UDim2New(Perc, 0, 1, 0)
-                Items["Val"].Instance.Text = tostring(Slider.Value)
-                Library.Flags[Slider.Flag] = Slider.Value
-                Library:SafeCall(Slider.Callback, Slider.Value)
+                local val = MathFloor(Slider.Min + (Slider.Max - Slider.Min) * Perc)
+                Set(val)
             end
 
-            Items["Bar"]:Connect("InputBegan", function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then Update(i) end end)
+            local Dragging = false
+            Items["Bar"]:Connect("InputBegan", function(Input)
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                    Dragging = true
+                    Update(Input)
+                end
+            end)
+
+            Library:Connect(UserInputService.InputChanged, function(Input)
+                if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
+                    Update(Input)
+                end
+            end)
+
+            Library:Connect(UserInputService.InputEnded, function(Input)
+                if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and Dragging then
+                    Dragging = false
+                end
+            end)
+
+            Set(Slider.Value)
             return Slider 
         end
 
-        -- DROPDOWN ATUALIZADO
+        -- DROPDOWN ATUALIZADO COM SUPORTE A BADGES
         Library.Sections.Dropdown = function(self, Data)
             Data = Data or {}
             local Dropdown = {Section = self, Name = Data.Name or "Dropdown", Items = Data.Items or {}, Flag = Data.Flag or Library:NextFlag(), Callback = Data.Callback or function() end, Open = false, Locked = Data.Lock or false}
@@ -2295,6 +2334,9 @@ local Library do
                 })
                 Instances:Create("UICorner", {Parent = Items["Main"].Instance})
                 
+                -- Adiciona suporte para Badge no Dropdown
+                Library:CreateBadge(Items["Main"].Instance, Data)
+
                 Items["Container"] = Instances:Create("Frame", {
                     Parent = Dropdown.Section.Items["Content"].Instance,
                     Size = UDim2New(1, 0, 0, 0),
@@ -2367,5 +2409,5 @@ local Library do
     function Library.Sections:AddLabel(Text) return self:Label(Text) end
 
     getgenv().Library = Library
-    return Library
 end
+
