@@ -324,32 +324,51 @@ do
             end
         end
 
+        -- SISTEMA DE ARRASTE CORRIGIDO (DIFERENÇA DE ANCHORPOINT E SCALE COMPENSADOS)
         Instances.MakeDraggable = function(self)
             if not self.Instance then return end
         
             local Gui = self.Instance
             local Dragging = false 
-            local DragStart, StartPosition
+            local DragStart, StartPos
         
             self:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
                     DragStart = Input.Position
-                    StartPosition = Gui.Position
+                    
+                    local ParentPos = Vector2New(0, 0)
+                    if Gui.Parent and Gui.Parent:IsA("GuiObject") then
+                        ParentPos = Gui.Parent.AbsolutePosition
+                    end
+                    
+                    -- Calcula o Offset equivalente absoluto para evitar saltos ou "snapping"
+                    local RelativePos = Gui.AbsolutePosition - ParentPos
+                    local AdjustedX = RelativePos.X + (Gui.AbsoluteSize.X * Gui.AnchorPoint.X)
+                    local AdjustedY = RelativePos.Y + (Gui.AbsoluteSize.Y * Gui.AnchorPoint.Y)
+                    
+                    Gui.Position = UDim2New(0, AdjustedX, 0, AdjustedY)
+                    StartPos = Gui.Position
                 end
             end)
         
             Library:Connect(UserInputService.InputChanged, function(Input)
                 if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
                     local DragDelta = Input.Position - DragStart
-                    local NewX = StartPosition.X.Offset + DragDelta.X
-                    local NewY = StartPosition.Y.Offset + DragDelta.Y
+                    local NewX = StartPos.X.Offset + DragDelta.X
+                    local NewY = StartPos.Y.Offset + DragDelta.Y
 
                     local ParentSize = (Gui.Parent and (Gui.Parent:IsA("GuiObject") or Gui.Parent:IsA("LayerCollector"))) and Gui.Parent.AbsoluteSize or Camera.ViewportSize
                     local GuiSize = Gui.AbsoluteSize
+                    
+                    -- Limites de tela dinâmicos respeitando os pontos de ancoragem
+                    local MinX = GuiSize.X * Gui.AnchorPoint.X
+                    local MaxX = ParentSize.X - (GuiSize.X * (1 - Gui.AnchorPoint.X))
+                    local MinY = GuiSize.Y * Gui.AnchorPoint.Y
+                    local MaxY = ParentSize.Y - (GuiSize.Y * (1 - Gui.AnchorPoint.Y))
         
-                    NewX = MathClamp(NewX, 0, ParentSize.X - GuiSize.X)
-                    NewY = MathClamp(NewY, 0, ParentSize.Y - GuiSize.Y)
+                    NewX = MathClamp(NewX, MinX, MaxX)
+                    NewY = MathClamp(NewY, MinY, MaxY)
         
                     Gui.Position = UDim2New(0, NewX, 0, NewY)
                 end
@@ -1085,13 +1104,13 @@ do
             Colorpicker:Update()
         end
 
-        local Debounce = false
+        local Bounce = false
         local RenderStepped  
 
         function Colorpicker:SetOpen(Bool)
-            if Debounce then return end
+            if Bounce then return end
             Colorpicker.IsOpen = Bool
-            Debounce = true 
+            Bounce = true 
 
             if Colorpicker.IsOpen then 
                 Items["ColorpickerWindow"].Instance.Visible = true
@@ -1144,7 +1163,7 @@ do
             end
             
             NewTween.Tween.Completed:Connect(function()
-                Debounce = false 
+                Bounce = false 
                 Items["ColorpickerWindow"].Instance.Visible = Colorpicker.IsOpen
                 task_wait(0.2)
                 Items["ColorpickerWindow"].Instance.Parent = not Colorpicker.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
@@ -2256,6 +2275,7 @@ do
             return Button
         end
 
+        -- SLIDER ATUALIZADO COM KNOB (BOLINHA DRAGGER)
         Library.Sections.Slider = function(self, Data)
             Data = Data or {}
             local Slider = {Section = self, Name = Data.Name or "Slider", Min = Data.Min or 0, Max = Data.Max or 100, Value = Data.Default or 0, Flag = Data.Flag or Library:NextFlag(), Callback = Data.Callback or function() end}
@@ -2267,6 +2287,19 @@ do
                 Items["Fill"] = Instances:Create("Frame", {Parent = Items["Bar"].Instance, Size = UDim2New(0, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent})
                 Instances:Create("UICorner", {Parent = Items["Fill"].Instance})
                 Items["Val"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1})
+                
+                -- Bolinha de Ajuste no Slider (Slider Knob)
+                Items["SliderDot"] = Instances:Create("Frame", {
+                    Parent = Items["Fill"].Instance,
+                    Size = UDim2New(0, 12, 0, 12),
+                    AnchorPoint = Vector2New(0.5, 0.5),
+                    Position = UDim2New(1, 0, 0.5, 0),
+                    BackgroundColor3 = FromRGB(255, 255, 255),
+                    BorderSizePixel = 0,
+                    ZIndex = 3
+                })
+                Instances:Create("UICorner", {Parent = Items["SliderDot"].Instance, CornerRadius = UDimNew(1, 0)})
+                Instances:Create("UIStroke", {Parent = Items["SliderDot"].Instance, Color = Library.Theme.Outline, Thickness = 1})
             end
 
             local function Set(val)
