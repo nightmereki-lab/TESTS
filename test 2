@@ -329,43 +329,35 @@ do
         
             local Gui = self.Instance
             local Dragging = false 
-            local DragStart, StartPosition, InputChanged
-        
-            local Set = function(Input)
-                local DragDelta = Input.Position - DragStart
-                local NewX = StartPosition.X.Offset + DragDelta.X
-                local NewY = StartPosition.Y.Offset + DragDelta.Y
-
-                local ParentSize = (Gui.Parent and (Gui.Parent:IsA("GuiObject") or Gui.Parent:IsA("LayerCollector"))) and Gui.Parent.AbsoluteSize or Camera.ViewportSize
-                local GuiSize = Gui.AbsoluteSize
-        
-                NewX = MathClamp(NewX, 0, ParentSize.X - GuiSize.X)
-                NewY = MathClamp(NewY, 0, ParentSize.Y - GuiSize.Y)
-        
-                self:Tween(TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, NewX, 0, NewY)})
-            end
+            local DragStart, StartPosition
         
             self:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
                     DragStart = Input.Position
                     StartPosition = Gui.Position
-        
-                    if InputChanged then return end
-        
-                    InputChanged = Input.Changed:Connect(function()
-                        if Input.UserInputState == Enum.UserInputState.End then
-                            Dragging = false
-                            InputChanged:Disconnect()
-                            InputChanged = nil
-                        end
-                    end)
                 end
             end)
         
             Library:Connect(UserInputService.InputChanged, function(Input)
-                if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and Dragging then
-                    Set(Input)
+                if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
+                    local DragDelta = Input.Position - DragStart
+                    local NewX = StartPosition.X.Offset + DragDelta.X
+                    local NewY = StartPosition.Y.Offset + DragDelta.Y
+
+                    local ParentSize = (Gui.Parent and (Gui.Parent:IsA("GuiObject") or Gui.Parent:IsA("LayerCollector"))) and Gui.Parent.AbsoluteSize or Camera.ViewportSize
+                    local GuiSize = Gui.AbsoluteSize
+        
+                    NewX = MathClamp(NewX, 0, ParentSize.X - GuiSize.X)
+                    NewY = MathClamp(NewY, 0, ParentSize.Y - GuiSize.Y)
+        
+                    Gui.Position = UDim2New(0, NewX, 0, NewY)
+                end
+            end)
+
+            Library:Connect(UserInputService.InputEnded, function(Input)
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                    Dragging = false
                 end
             end)
         
