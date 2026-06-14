@@ -76,6 +76,7 @@ do
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         Flags = {},
+        IsInteracting = false, -- Flag para evitar que a interface se mova ao usar controles
         Tween = {
             Time = 0.2,
             Style = Enum.EasingStyle.Circular,
@@ -338,6 +339,7 @@ do
             local DragStart, StartPos
         
             self:Connect("InputBegan", function(Input)
+                if Library.IsInteracting then return end -- Cancela arrasto se estiver mexendo em sliders/controles
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
                     DragStart = Input.Position
@@ -404,6 +406,7 @@ do
                     Text = "",
                     BorderSizePixel = 0,
                     AutoButtonColor = false,
+                    Active = true,
                     Parent = Gui,
                     ZIndex = 99999,
                 })
@@ -420,6 +423,7 @@ do
 
             local BeginResizing = function(Side)
                 Resizing = true 
+                Library.IsInteracting = true -- Trava movimentação da interface
                 CurrentSide = Side 
                 StartMouse = UserInputService:GetMouseLocation()
                 StartPosition = Vector2New(Gui.Position.X.Offset, Gui.Position.Y.Offset)
@@ -432,6 +436,7 @@ do
 
             local EndResizing = function()
                 Resizing = false 
+                Library.IsInteracting = false -- Destrava movimentação da interface
                 CurrentSide = nil
                 for _, Value in ipairs(Edges) do 
                     Value.Button.Instance.BackgroundTransparency = 1
@@ -537,6 +542,7 @@ do
             BackgroundColor3 = FromRGB(8, 8, 10),
             BackgroundTransparency = 1,
             Text = "",
+            Active = true,
             AutoButtonColor = false,
             ZIndex = baseZIndex
         })
@@ -544,7 +550,7 @@ do
         local Container = Instances:Create("Frame", {
             Parent = Overlay.Instance,
             AnchorPoint = Vector2New(0.5, 0.5),
-            Position = UDim2New(0.5, 0, 0.45, 0), -- Entrada tridimensional deslocada
+            Position = UDim2New(0.5, 0, 0.45, 0),
             Size = UDim2New(0, 340, 0, 200),
             BackgroundColor3 = Library.Theme.Background,
             BorderSizePixel = 0,
@@ -586,6 +592,7 @@ do
             FontFace = Library.Font,
             TextColor3 = FromRGB(255, 255, 255),
             BackgroundColor3 = BadgeColor,
+            Active = true,
             Size = UDim2New(0, 120, 0, 35),
             Position = UDim2New(0.5, -60, 1, -45),
             BorderSizePixel = 0,
@@ -593,7 +600,7 @@ do
         })
         Instances:Create("UICorner", { Parent = Close.Instance, CornerRadius = UDimNew(0, 6) })
 
-        Container.Instance.Size = UDim2New(0, 238, 0, 140) -- Abre escalonado
+        Container.Instance.Size = UDim2New(0, 238, 0, 140)
         TweenService:Create(Overlay.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.65}):Play()
         TweenService:Create(Container.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 340, 0, 200), Position = UDim2New(0.5, 0, 0.5, 0)}):Play()
 
@@ -625,6 +632,7 @@ do
             TextSize = 10,
             TextColor3 = FromRGB(255, 255, 255),
             BackgroundColor3 = BColor,
+            Active = true,
             Size = UDim2New(0, 42, 0, 16),
             Position = UDim2New(0, Parent.TextBounds.X + 10, 0.5, -8),
             BorderSizePixel = 0,
@@ -692,83 +700,109 @@ do
     })
     Instances:Create("UIListLayout", {
         Parent = NotifList.Instance,
-        Padding = UDimNew(0, 8),
+        Padding = UDimNew(0, 10),
         VerticalAlignment = Enum.VerticalAlignment.Bottom,
         HorizontalAlignment = Enum.HorizontalAlignment.Right,
         SortOrder = Enum.SortOrder.LayoutOrder
     })
 
-    function Library:Notify(Data)
-        Data = Data or {}
-        local Title = Data.Title or "Notificação"
-        local Content = Data.Content or "Ação executada com sucesso."
-        local Duration = Data.Duration or 5
-        local Type = Data.Type or "SAFE"
-        local Color = Library.BadgeColors[Type:upper()] or Library.Theme.Accent
-        
-        local Toast = Instances:Create("Frame", {
-            Parent = NotifList.Instance,
-            Size = UDim2New(1, 0, 0, 0),
-            BackgroundColor3 = Library.Theme.Background,
-            BorderSizePixel = 0,
-            ClipsDescendants = true,
-            ZIndex = 999999
-        })
-        Instances:Create("UICorner", { Parent = Toast.Instance, CornerRadius = UDimNew(0, 8) })
-        local stroke = Instances:Create("UIStroke", { Parent = Toast.Instance, Color = Color, Thickness = 1.2 })
-        
-        local TopBar = Instances:Create("Frame", {
-            Parent = Toast.Instance,
-            Size = UDim2New(1, 0, 0, 24),
-            BackgroundTransparency = 1
-        })
-        
-        local TitleLabel = Instances:Create("TextLabel", {
-            Parent = TopBar.Instance,
-            Text = Title,
-            FontFace = Library.Font,
-            TextColor3 = Color,
-            TextSize = 13,
-            Position = UDim2New(0, 10, 0, 0),
-            Size = UDim2New(1, -20, 1, 0),
-            BackgroundTransparency = 1,
-            TextXAlignment = Enum.TextXAlignment.Left
-        })
-        
-        local ContentLabel = Instances:Create("TextLabel", {
-            Parent = Toast.Instance,
-            Text = Content,
-            FontFace = Library.Font,
-            TextColor3 = Library.Theme.Text,
-            TextSize = 12,
-            Position = UDim2New(0, 10, 0, 26),
-            Size = UDim2New(1, -20, 0, 34),
-            BackgroundTransparency = 1,
-            TextWrapped = true,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextYAlignment = Enum.TextYAlignment.Top
-        })
-        
-        local ProgressFill = Instances:Create("Frame", {
-            Parent = Toast.Instance,
-            Size = UDim2New(1, 0, 0, 3),
-            Position = UDim2New(0, 0, 1, -3),
-            BackgroundColor3 = Color,
-            BorderSizePixel = 0
-        })
-        
-        local targetHeight = 65
-        Toast:Tween(TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2New(1, 0, 0, targetHeight)})
-        ProgressFill:Tween(TweenInfo.new(Duration, Enum.EasingStyle.Linear), {Size = UDim2New(0, 0, 0, 3)})
-        
-        task_delay(Duration, function()
-            if Toast.Instance and Toast.Instance.Parent then
-                local t = Toast:Tween(TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2New(1, 0, 0, 0)})
-                t.Tween.Completed:Connect(function()
-                    Toast:Clean()
-                end)
-            end
+    -- NOVA NOTIFICAÇÃO (PORTADO DO MODELO EXECUTADO)
+    function Library:Notify(NotificationConfig)
+        NotificationConfig = NotificationConfig or {}
+        local Name = NotificationConfig.Name or NotificationConfig.Title or "Notification"
+        local Content = NotificationConfig.Content or NotificationConfig.Text or "Test"
+        local Image = NotificationConfig.Image or "rbxassetid://4384403532"
+        local Time = NotificationConfig.Time or NotificationConfig.Duration or 15
+
+        task.spawn(function()
+            local NotificationParent = Instances:Create("Frame", {
+                Size = UDim2New(1, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                BackgroundTransparency = 1,
+                Parent = NotifList.Instance
+            })
+
+            local NotificationFrame = Instances:Create("Frame", {
+                Parent = NotificationParent.Instance, 
+                Size = UDim2New(1, 0, 0, 0),
+                Position = UDim2New(1, -55, 0, 0),
+                BackgroundColor3 = FromRGB(25, 25, 25),
+                BackgroundTransparency = 0,
+                AutomaticSize = Enum.AutomaticSize.Y
+            })
+            Instances:Create("UICorner", { Parent = NotificationFrame.Instance, CornerRadius = UDimNew(0, 10) })
+            
+            local UIStroke = Instances:Create("UIStroke", {
+                Parent = NotificationFrame.Instance,
+                Color = FromRGB(93, 93, 93),
+                Thickness = 1.2
+            })
+            
+            Instances:Create("UIPadding", {
+                Parent = NotificationFrame.Instance,
+                PaddingTop = UDimNew(0, 12),
+                PaddingBottom = UDimNew(0, 12),
+                PaddingLeft = UDimNew(0, 12),
+                PaddingRight = UDimNew(0, 12)
+            })
+
+            local Icon = Instances:Create("ImageLabel", {
+                Parent = NotificationFrame.Instance,
+                Size = UDim2New(0, 20, 0, 20),
+                Image = Image,
+                ImageColor3 = FromRGB(240, 240, 240),
+                BackgroundTransparency = 1,
+                Name = "Icon"
+            })
+
+            local Title = Instances:Create("TextLabel", {
+                Parent = NotificationFrame.Instance,
+                Size = UDim2New(1, -30, 0, 20),
+                Position = UDim2New(0, 30, 0, 0),
+                Text = Name,
+                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
+                TextSize = 15,
+                TextColor3 = FromRGB(255, 255, 255),
+                BackgroundTransparency = 1,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Name = "Title"
+            })
+
+            local ContentLabel = Instances:Create("TextLabel", {
+                Parent = NotificationFrame.Instance,
+                Size = UDim2New(1, 0, 0, 0),
+                Position = UDim2New(0, 0, 0, 25),
+                Text = Content,
+                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                TextSize = 14,
+                TextColor3 = FromRGB(200, 200, 200),
+                BackgroundTransparency = 1,
+                TextWrapped = true,
+                AutomaticSize = Enum.AutomaticSize.Y,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Name = "Content"
+            })
+
+            TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2New(0, 0, 0, 0)}):Play()
+
+            task_wait(Time - 0.88)
+            TweenService:Create(Icon.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 1}):Play()
+            TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.8, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.6}):Play()
+            task_wait(0.3)
+            TweenService:Create(UIStroke.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {Transparency = 0.9}):Play()
+            TweenService:Create(Title.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {TextTransparency = 0.4}):Play()
+            TweenService:Create(ContentLabel.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {TextTransparency = 0.5}):Play()
+            task_wait(0.05)
+
+            local exitTween = TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Position = UDim2New(1, 20, 0, 0)})
+            exitTween:Play()
+            task_wait(1.35)
+            NotificationParent:Clean()
         end)
+    end
+
+    function Library:MakeNotification(NotificationConfig)
+        self:Notify(NotificationConfig)
     end
 
     Library.Unload = function(self)
@@ -992,6 +1026,7 @@ do
                 BorderColor3 = FromRGB(0, 0, 0),
                 Text = "",
                 AutoButtonColor = false,
+                Active = true,
                 Size = UDim2New(0, 20, 0, 16),
                 BorderSizePixel = 0,
                 TextSize = 14,
@@ -1032,6 +1067,7 @@ do
                 BorderColor3 = FromRGB(0, 0, 0),
                 Text = "",
                 AutoButtonColor = false,
+                Active = true,
                 Position = UDim2New(0, 94, 0, 60),
                 Size = UDim2New(0, 160, 0, 160),
                 BorderSizePixel = 0,
@@ -1051,6 +1087,7 @@ do
                 BorderColor3 = FromRGB(0, 0, 0),
                 Text = "",
                 AutoButtonColor = false,
+                Active = true,
                 Position = UDim2New(0, 8, 0, 8),
                 Size = UDim2New(1, -40, 1, -16),
                 BorderSizePixel = 0,
@@ -1122,6 +1159,7 @@ do
                 BorderColor3 = FromRGB(0, 0, 0),
                 Text = "",
                 AutoButtonColor = false,
+                Active = true,
                 AnchorPoint = Vector2New(1, 0),
                 Position = UDim2New(1, -8, 0, 8),
                 Size = UDim2New(0, 15, 1, -16),
@@ -1291,23 +1329,6 @@ do
             end)
         end
 
-        function Colorpicker:Set(Color)
-            if type(Color) == "table" then
-                Color = FromRGB(Color[1], Color[2], Color[3])
-            elseif type(Color) == "string" then
-                Color = FromHex(Color)
-            end 
-
-            Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = Color:ToHSV()
-            local PaletteValueX = MathClamp(Colorpicker.Saturation, 0, 0.955)
-            local PaletteValueY = MathClamp(1 - Colorpicker.Value, 0, 0.955)
-            local SlideY = MathClamp(Colorpicker.Hue, 0, 0.955)
-
-            Items["PaletteDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(PaletteValueX, 0, PaletteValueY, 0)})
-            Items["HueDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, SlideY, 0)})
-            Colorpicker:Update()
-        end
-
         Items["ColorpickerButton"]:Connect("MouseButton1Down", function()
             Colorpicker:SetOpen(not Colorpicker.IsOpen)
         end)
@@ -1315,12 +1336,14 @@ do
         Items["Palette"]:Connect("InputBegan", function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                 SlidingPalette = true 
+                Library.IsInteracting = true
                 Colorpicker:SlidePalette(Input)
 
                 if PaletteChanged then return end
                 PaletteChanged = Input.Changed:Connect(function()
                     if Input.UserInputState == Enum.UserInputState.End then
                         SlidingPalette = false
+                        Library.IsInteracting = false
                         PaletteChanged:Disconnect()
                         PaletteChanged = nil
                     end
@@ -1331,12 +1354,14 @@ do
         Items["Hue"]:Connect("InputBegan", function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                 SlidingHue = true 
+                Library.IsInteracting = true
                 Colorpicker:SlideHue(Input)
 
                 if HueChanged then return end
                 HueChanged = Input.Changed:Connect(function()
                     if Input.UserInputState == Enum.UserInputState.End then
                         SlidingHue = false
+                        Library.IsInteracting = false
                         HueChanged:Disconnect()
                         HueChanged = nil
                     end
@@ -1355,6 +1380,16 @@ do
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and Colorpicker.IsOpen then
                 if not Library:IsMouseOverFrame(Items["ColorpickerWindow"]) then
                     Colorpicker:SetOpen(false)
+                end
+            end
+        end)
+
+        Library:Connect(UserInputService.InputEnded, function(Input)
+            if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
+                if SlidingPalette or SlidingHue then
+                    SlidingPalette = false
+                    SlidingHue = false
+                    Library.IsInteracting = false
                 end
             end
         end)
@@ -1389,6 +1424,7 @@ do
                 TextTransparency = 0.5,
                 Text = "[C]",
                 AutoButtonColor = false,
+                Active = true,
                 Size = UDim2New(0, 0, 1, 0),
                 BackgroundTransparency = 1,
                 BorderSizePixel = 0,
@@ -1405,6 +1441,7 @@ do
                 BorderColor3 = FromRGB(0, 0, 0),
                 Text = "",
                 AutoButtonColor = false,
+                Active = true,
                 Position = UDim2New(0, 10, 0, 10),
                 BorderSizePixel = 0,
                 AutomaticSize = Enum.AutomaticSize.XY,
@@ -1425,6 +1462,7 @@ do
                 Text = "Toggle",
                 AutoButtonColor = false,
                 BackgroundTransparency = 1,
+                Active = true,
                 Size = UDim2New(0, 0, 0, 15),
                 BorderSizePixel = 0,
                 AutomaticSize = Enum.AutomaticSize.X,
@@ -1452,6 +1490,7 @@ do
                 TextTransparency = 0.5,
                 Text = "Hold",
                 AutoButtonColor = false,
+                Active = true,
                 Size = UDim2New(0, 0, 0, 15),
                 BackgroundTransparency = 1,
                 BorderSizePixel = 0,
@@ -1467,6 +1506,7 @@ do
                 TextTransparency = 0.5,
                 Text = "Always",
                 AutoButtonColor = false,
+                Active = true,
                 Size = UDim2New(0, 0, 0, 15),
                 BackgroundTransparency = 1,
                 BorderSizePixel = 0,
@@ -1917,6 +1957,7 @@ do
                 ProfileButton.Size = UDim2New(1, 0, 1, 0)
                 ProfileButton.BackgroundTransparency = 1
                 ProfileButton.Text = ""
+                ProfileButton.Active = true
                 ProfileButton.Parent = BottomTab
                 ProfileButton.ZIndex = 5
 
@@ -1970,6 +2011,7 @@ do
                     toggleContainer.Position = UDim2New(0.92, -45, 0.5, -12)
                     toggleContainer.BackgroundColor3 = isAnonymous and Library.Theme.Accent or Library.Theme.Element
                     toggleContainer.Text = ""
+                    toggleContainer.Active = true
                     toggleContainer.AutoButtonColor = false
                     toggleContainer.ZIndex = 10001
                     toggleContainer.Parent = dialog
@@ -2778,6 +2820,7 @@ do
                     Text = "",
                     AutoButtonColor = false,
                     BackgroundTransparency = 1,
+                    Active = true,
                     Size = UDim2New(1, 0, 0, 22),
                 })
                 
@@ -2871,6 +2914,7 @@ do
                     Text = Button.Name,
                     TextColor3 = Library.Theme.Text,
                     FontFace = Library.Font,
+                    Active = true,
                     TextSize = 15
                 }):AddToTheme({BackgroundColor3 = 'Element', TextColor3 = 'Text'})
                 Instances:Create("UICorner", {Parent = Items["Main"].Instance})
@@ -2905,7 +2949,7 @@ do
             local Items = {} do 
                 Items["Main"] = Instances:Create("Frame", {Parent = Slider.Section.Items["Content"].Instance, Size = UDim2New(1, 0, 0, 35), BackgroundTransparency = 1})
                 Items["Text"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, Text = Slider.Name, FontFace = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 14, BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 15)})
-                Items["Bar"] = Instances:Create("Frame", {Parent = Items["Main"].Instance, Position = UDim2New(0, 0, 0, 22), Size = UDim2New(1, 0, 0, 6), BackgroundColor3 = Library.Theme.Element})
+                Items["Bar"] = Instances:Create("Frame", {Parent = Items["Main"].Instance, Position = UDim2New(0, 0, 0, 22), Size = UDim2New(1, 0, 0, 6), BackgroundColor3 = Library.Theme.Element, Active = true})
                 Instances:Create("UICorner", {Parent = Items["Bar"].Instance})
                 Items["Fill"] = Instances:Create("Frame", {Parent = Items["Bar"].Instance, Size = UDim2New(0, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent})
                 Instances:Create("UICorner", {Parent = Items["Fill"].Instance})
@@ -2951,6 +2995,7 @@ do
             Items["Bar"]:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
+                    Library.IsInteracting = true -- Trava movimentação da interface
                     TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 14, 0, 14)}):Play()
                     Update()
                 end
@@ -2964,8 +3009,11 @@ do
 
             Library:Connect(UserInputService.InputEnded, function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-                    Dragging = false
-                    TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 12, 0, 12)}):Play()
+                    if Dragging then
+                        Dragging = false
+                        Library.IsInteracting = false -- Destrava movimentação da interface
+                        TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 12, 0, 12)}):Play()
+                    end
                 end
             end)
 
@@ -2996,6 +3044,7 @@ do
                     TextColor3 = Library.Theme.Text,
                     FontFace = Library.Font,
                     TextSize = 15,
+                    Active = true,
                     AutoButtonColor = false
                 })
                 Instances:Create("UICorner", {Parent = Items["Main"].Instance})
@@ -3086,6 +3135,7 @@ do
                             Text = v, 
                             TextColor3 = Library.Theme.Text, 
                             TextTransparency = 0.4,
+                            Active = true,
                             FontFace = Library.Font, 
                             TextSize = 14
                         })
