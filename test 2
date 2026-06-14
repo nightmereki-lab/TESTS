@@ -85,7 +85,7 @@ do
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         Flags = {},
-        IsInteracting = false, -- Gerencia estados de arraste para evitar conflitos de arrastar janela
+        IsInteracting = false, -- Gerencia estados de arraste para evitar conflito com a janela
         Tween = {
             Time = 0.2,
             Style = Enum.EasingStyle.Circular,
@@ -162,7 +162,7 @@ do
         ["Equals"]            = "=",
         ["At"]                = "@",
         ["LeftBracket"]       = "LeftBracket",
-        ["RightBracket"]      = "RightBracket",
+        ["RightBracket"]      = "RightBracked",
         ["BackSlash"]         = "BackSlash",
         ["Caret"]             = "^",
         ["Underscore"]        = "_",
@@ -185,11 +185,11 @@ do
         ["KeypadNine"]        = "Keypad9",
         ["KeypadPeriod"]      = "KeypadP",
         ["KeypadDivide"]      = "KeypadD",
-        ["KeypadMultiply"]    = "KeypadMultiply",
-        ["KeypadMinus"]       = "KeypadMinus",
-        ["KeypadPlus"]        = "KeypadPlus",
-        ["KeypadEnter"]       = "KeypadEnter",
-        ["KeypadEquals"]      = "KeypadEquals",
+        ["KeypadMultiply"]    = "KeypadM",
+        ["KeypadMinus"]       = "KeypadM",
+        ["KeypadPlus"]        = "KeypadP",
+        ["KeypadEnter"]       = "KeypadE",
+        ["KeypadEquals"]      = "KeypadE",
         ["Insert"]            = "Insert",
         ["Home"]              = "Home",
         ["PageUp"]            = "PageUp",
@@ -348,7 +348,7 @@ do
             local DragStart, StartPos
         
             self:Connect("InputBegan", function(Input)
-                if Library.IsInteracting then return end 
+                if Library.IsInteracting then return end -- Bloqueia arraste se o usuário estiver arrastando sliders/colorpickers
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
                     DragStart = Input.Position
@@ -758,10 +758,11 @@ do
                 Parent = NotificationParent.Instance, 
                 Size = UDim2New(1, 0, 0, 0),
                 Position = UDim2New(1, -55, 0, 0),
-                BackgroundColor3 = FromRGB(25, 25, 25),
+                BackgroundColor3 = FromRGB(255, 255, 255),
                 BackgroundTransparency = 0,
                 AutomaticSize = Enum.AutomaticSize.Y
             })
+            NotificationFrame.Instance.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
             Instances:Create("UICorner", { Parent = NotificationFrame.Instance, CornerRadius = UDimNew(0, 10) })
             
             local UIStroke = Instances:Create("UIStroke", {
@@ -1257,7 +1258,6 @@ do
             end
         end
 
-        -- RESTAURADO MÉTODO :Set()
         function Colorpicker:Set(Color)
             if type(Color) == "table" then
                 Color = FromRGB(Color[1], Color[2], Color[3])
@@ -2024,8 +2024,7 @@ do
 
                     local dialog = InstanceNew("Frame")
                     dialog.Name = "AnonymousDialog"
-                    dialog.Size = UDim2New(0, 0, 0, 0)
-                    dialog.ClipsDescendants = true
+                    dialog.Size = UDim2New(0, 260, 0, 80)
                     dialog.Position = UDim2New(0.5, -130, 0.5, -40)
                     dialog.BackgroundColor3 = Library.Theme.Background
                     dialog.Parent = Items["MainFrame"].Instance
@@ -2091,8 +2090,6 @@ do
                         TweenService:Create(circle, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
                         TweenService:Create(toggleContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetColor}):Play()
                     end)
-
-                    TweenService:Create(dialog, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 260, 0, 80)}):Play()
                 end
 
                 ProfileButton.MouseButton1Click:Connect(function()
@@ -2315,11 +2312,10 @@ do
                     end
                 end
 
+                -- ALGORITMO ORIGINAL RESTAURADO (Permissivo com proximidade 'OR')
                 local function MatchQuery(name, query)
                     name = StringLower(name)
                     query = StringLower(query)
-                    
-                    if query == "" then return false end
                     
                     if StringFind(name, query, 1, true) then
                         return true
@@ -2330,21 +2326,20 @@ do
                         TableInsert(words, word)
                     end
                     
-                    if #words == 0 then return false end
-                    
-                    for _, word in ipairs(words) do
-                        if not StringFind(name, word, 1, true) then
-                            return false
+                    if #words > 0 then
+                        for _, word in ipairs(words) do
+                            if StringFind(name, word, 1, true) then
+                                return true
+                            end
                         end
                     end
                     
-                    return true
+                    return false
                 end
 
                 local function UpdateSearch()
                     local success, err = pcall(function()
-                        local rawText = Items["SearchInput"].Instance.Text
-                        local query = StringLower(rawText):gsub("^%s*(.-)%s*$", "%1")
+                        local query = StringLower(Items["SearchInput"].Instance.Text)
                         
                         for _, child in ipairs(SearchPopup.Scroll.Instance:GetChildren()) do
                             if child:IsA("TextButton") or child:IsA("TextLabel") then
@@ -2364,10 +2359,6 @@ do
                         local matchesCount = 0
 
                         for _, data in ipairs(Window.SearchableElements) do
-                            if not data.Element or not data.Element:IsDescendantOf(Items["MainFrame"].Instance) then
-                                continue
-                            end
-
                             local matches = MatchQuery(data.Name or "", query)
                             if matches then
                                 matchesCount = matchesCount + 1
@@ -3286,7 +3277,6 @@ do
                 CPItems["ColorpickerButton"].Instance.AnchorPoint = Vector2New(1, 0.5)
                 CPItems["ColorpickerButton"].Instance.Position = UDim2New(1, 0, 0.5, 0)
 
-                -- EXPOSTO MÉTODO PÚBLICO :Set() PARA O WRAPPER
                 function Colorpicker:Set(Color)
                     CP:Set(Color)
                 end
