@@ -75,9 +75,9 @@ do
     local BadgeDescriptions = {
         BUG  = "Esta função não está funcionando perfeitamente e pode conter falhas técnicas.",
         RISK = "Esta função possui risco de banimento vinculado. A punição não é garantida, mas recomendamos cautela.",
-        TEST = "Função em fase de testes. Ainda não foi completamente testada, podendo causar erros ou banimento.",
+        TEST = "Função ainda não testada completamente. Pode conter erros técnicos ou riscos não mapeados de ban.",
         SAFE = "Função recomendada e segura para uso. Projetada para minimizar o risco de banimento.",
-        NEW  = "Nova função recentemente adicionada, totalmente testada, aprovada e segura para uso.",
+        NEW  = "Nova função adicionada recentemente, totalmente testada, aprovada e segura para uso.",
         VIP  = "Função exclusiva destinada apenas aos usuários que possuem o plano VIP/Premium."
     }
 
@@ -85,7 +85,7 @@ do
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         Flags = {},
-        IsInteracting = false, -- Flag global para gerenciar prioridade de arrastes na tela
+        IsInteracting = false, -- Gerencia estados de arraste para evitar conflito com a janela
         Tween = {
             Time = 0.2,
             Style = Enum.EasingStyle.Circular,
@@ -115,12 +115,12 @@ do
         CurrentPopupZIndex = 20000,
 
         BadgeColors = {
-            BUG  = FromRGB(255, 75, 75),     -- Vermelho
-            RISK = FromRGB(255, 215, 0),    -- Amarelo
-            TEST = FromRGB(255, 140, 0),    -- Laranja
-            SAFE = FromRGB(160, 50, 255),   -- Roxo
-            NEW  = FromRGB(46, 204, 113),   -- Verde
-            VIP  = FromRGB(52, 152, 219)    -- Azul
+            BUG  = FromRGB(255, 75, 75),
+            RISK = FromRGB(255, 215, 0),
+            TEST = FromRGB(255, 140, 0),
+            SAFE = FromRGB(160, 50, 255),
+            NEW  = FromRGB(46, 204, 113),
+            VIP  = FromRGB(52, 152, 219)
         }
     }
 
@@ -348,7 +348,7 @@ do
             local DragStart, StartPos
         
             self:Connect("InputBegan", function(Input)
-                if Library.IsInteracting then return end -- Bloqueia arraste se houver interação ativa
+                if Library.IsInteracting then return end 
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
                     DragStart = Input.Position
@@ -1046,7 +1046,9 @@ do
             Value = 0,
             Color = FromRGB(0, 0, 0),
             Hex = "#000000",
-            IsOpen = false 
+            IsOpen = false,
+            SlidingPalette = false,
+            SlidingHue = false
         }
 
         local Items = {} do 
@@ -1170,13 +1172,16 @@ do
             
             Items["PaletteDragger"] = Instances:Create("Frame", {
                 Parent = Items["Palette"].Instance,
-                BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(0, 5, 0, 5),
-                BorderSizePixel = 0
+                Size = UDim2New(0, 8, 0, 8),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                AnchorPoint = Vector2New(0.5, 0.5)
             })
             
-            Instances:Create("UIStroke", {
-                Parent = Items["PaletteDragger"].Instance
+            local draggerStroke = Instances:Create("UIStroke", {
+                Parent = Items["PaletteDragger"].Instance,
+                Color = FromRGB(255, 255, 255),
+                Thickness = 1.5
             })
             
             Instances:Create("UICorner", {
@@ -1213,18 +1218,21 @@ do
             Items["HueDragger"] = Instances:Create("Frame", {
                 Parent = Items["Hue"].Instance,
                 BackgroundTransparency = 1,
-                BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(0, 15, 0, 15),
-                BorderSizePixel = 0
+                BorderSizePixel = 0,
+                Size = UDim2New(1, 4, 0, 4),
+                Position = UDim2New(0, -2, 0, 0),
+                AnchorPoint = Vector2New(0, 0.5)
+            })
+            
+            local hueStroke = Instances:Create("UIStroke", {
+                Parent = Items["HueDragger"].Instance,
+                Color = FromRGB(255, 255, 255),
+                Thickness = 1.5
             })
             
             Instances:Create("UICorner", {
                 Parent = Items["HueDragger"].Instance,
-                CornerRadius = UDimNew(1, 0)
-            })
-            
-            Instances:Create("UIStroke", {
-                Parent = Items["HueDragger"].Instance
+                CornerRadius = UDimNew(0, 2)
             })            
         end
 
@@ -1249,11 +1257,8 @@ do
             end
         end
 
-        local SlidingPalette = false
-        local PaletteChanged
-        
         function Colorpicker:SlidePalette(Input)
-            if not Input or not SlidingPalette then return end
+            if not Input or not Colorpicker.SlidingPalette then return end
 
             local ValueX = MathClamp((Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 1)
             local ValueY = MathClamp(1 - (Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 1)
@@ -1261,24 +1266,17 @@ do
             Colorpicker.Saturation = ValueX
             Colorpicker.Value = ValueY
 
-            local SlideX = MathClamp((Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 0.955)
-            local SlideY = MathClamp((Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 0.955)
-
-            Items["PaletteDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(SlideX, 0, SlideY, 0)})
+            Items["PaletteDragger"].Instance.Position = UDim2New(ValueX, 0, 1 - ValueY, 0)
             Colorpicker:Update()
         end
-        
-        local SlidingHue = false
-        local HueChanged
 
         function Colorpicker:SlideHue(Input)
-            if not Input or not SlidingHue then return end
+            if not Input or not Colorpicker.SlidingHue then return end
             
             local ValueY = MathClamp((Input.Position.Y - Items["Hue"].Instance.AbsolutePosition.Y) / Items["Hue"].Instance.AbsoluteSize.Y, 0, 1)
             Colorpicker.Hue = ValueY
 
-            local SlideY = MathClamp((Input.Position.Y - Items["Hue"].Instance.AbsolutePosition.Y) / Items["Hue"].Instance.AbsoluteSize.Y, 0, 0.91)
-            Items["HueDragger"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, SlideY, 0)})
+            Items["HueDragger"].Instance.Position = UDim2New(0, 0, ValueY, 0)
             Colorpicker:Update()
         end
 
@@ -1361,20 +1359,36 @@ do
             end)
         end
 
+        function Colorpicker:Set(Color)
+            if type(Color) == "table" then
+                Color = FromRGB(Color[1], Color[2], Color[3])
+            elseif type(Color) == "string" then
+                Color = FromHex(Color)
+            end 
+
+            Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = Color:ToHSV()
+            local PaletteValueX = MathClamp(Colorpicker.Saturation, 0, 1)
+            local PaletteValueY = MathClamp(1 - Colorpicker.Value, 0, 1)
+
+            Items["PaletteDragger"].Instance.Position = UDim2New(PaletteValueX, 0, PaletteValueY, 0)
+            Items["HueDragger"].Instance.Position = UDim2New(0, 0, Colorpicker.Hue, 0)
+            Colorpicker:Update()
+        end
+
         Items["ColorpickerButton"]:Connect("MouseButton1Down", function()
             Colorpicker:SetOpen(not Colorpicker.IsOpen)
         end)
 
         Items["Palette"]:Connect("InputBegan", function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-                SlidingPalette = true 
+                Colorpicker.SlidingPalette = true 
                 Library.IsInteracting = true
                 Colorpicker:SlidePalette(Input)
 
                 if PaletteChanged then return end
                 PaletteChanged = Input.Changed:Connect(function()
                     if Input.UserInputState == Enum.UserInputState.End then
-                        SlidingPalette = false
+                        Colorpicker.SlidingPalette = false
                         Library.IsInteracting = false
                         PaletteChanged:Disconnect()
                         PaletteChanged = nil
@@ -1385,14 +1399,14 @@ do
 
         Items["Hue"]:Connect("InputBegan", function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-                SlidingHue = true 
+                Colorpicker.SlidingHue = true 
                 Library.IsInteracting = true
                 Colorpicker:SlideHue(Input)
 
                 if HueChanged then return end
                 HueChanged = Input.Changed:Connect(function()
                     if Input.UserInputState == Enum.UserInputState.End then
-                        SlidingHue = false
+                        Colorpicker.SlidingHue = false
                         Library.IsInteracting = false
                         HueChanged:Disconnect()
                         HueChanged = nil
@@ -1403,8 +1417,8 @@ do
 
         Library:Connect(UserInputService.InputChanged, function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch then
-                if SlidingPalette then Colorpicker:SlidePalette(Input) end
-                if SlidingHue then Colorpicker:SlideHue(Input) end
+                if Colorpicker.SlidingPalette then Colorpicker:SlidePalette(Input) end
+                if Colorpicker.SlidingHue then Colorpicker:SlideHue(Input) end
             end
         end)
 
@@ -1418,9 +1432,9 @@ do
 
         Library:Connect(UserInputService.InputEnded, function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
-                if SlidingPalette or SlidingHue then
-                    SlidingPalette = false
-                    SlidingHue = false
+                if Colorpicker.SlidingPalette or Colorpicker.SlidingHue then
+                    Colorpicker.SlidingPalette = false
+                    Colorpicker.SlidingHue = false
                     Library.IsInteracting = false
                 end
             end
@@ -1455,8 +1469,8 @@ do
                 TextColor3 = Library.Theme["Text"],
                 TextTransparency = 0.5,
                 Text = "[C]",
-                AutoButtonColor = false,
                 Active = true,
+                AutoButtonColor = false,
                 Size = UDim2New(0, 0, 1, 0),
                 BackgroundTransparency = 1,
                 BorderSizePixel = 0,
@@ -2671,6 +2685,8 @@ do
                 Window.MinimizeButton = ToggleButton
             end
 
+            Window:AddConfigPage()
+
             Window:SetOpen(true)
             return setmetatable(Window, Library)
         end
@@ -3035,7 +3051,7 @@ do
             Items["Bar"]:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
-                    Library.IsInteracting = true -- Bloqueia arraste da tela
+                    Library.IsInteracting = true -- Trava movimentação da interface
                     TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 14, 0, 14)}):Play()
                     Update()
                 end
