@@ -1,34 +1,4 @@
-Esse erro (attempt to call a nil value) na linha 4 do seu script de execução
-significa que a função loadstring() não conseguiu compilar o código da
-biblioteca que está hospedada no seu GitHub e, por isso, retornou nil.
 
-O motivo disso é que a versão anterior continha um pequeno erro de digitação de
-sintaxe (um caractere incorreto) na função de pesquisa interna do Dropdown.
-
-Onde estava o erro:
-
-Dentro de Library.Sections.Dropdown, a função de filtragem continha chaves { ...
-} em vez de declarar a variável local:
-
--- Como estava (Incorreto - Gerava erro de sintaxe no compilador):
-{ matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil }
-item.Button.Instance.Visible = matches
-
--- Como deve ser (Correto):
-local matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil
-item.Button.Instance.Visible = matches
-
-Como o compilador do Luau encontrou essa instrução inválida, ele rejeitou o
-código inteiro.
-
-Solução:
-
-Para corrigir, substitua todo o conteúdo do seu arquivo no GitHub
-(https://raw.githubusercontent.com/nightmereki-lab/TESTS/refs/heads/main/test%202)
-pelo código completo e corrigido abaixo.
-
-Assim que você atualizar o arquivo no seu repositório, o seu script de teste
-carregará normalmente.
 
 if getgenv().Library then
     getgenv().Library:Unload()
