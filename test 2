@@ -334,6 +334,7 @@ do
             end
         end
 
+        -- SISTEMA DE ARRASTE CORRIGIDO (DIFERENÇA DE ANCHORPOINT E SCALE COMPENSADOS)
         Instances.MakeDraggable = function(self)
             if not self.Instance then return end
         
@@ -2090,13 +2091,38 @@ do
                     end
                 end
 
+                -- Algoritmo inteligente de correspondência por proximidade e divisão de palavras (Fuzzy)
+                local function MatchQuery(name, query)
+                    name = StringLower(name)
+                    query = StringLower(query)
+                    
+                    if StringFind(name, query, 1, true) then
+                        return true
+                    end
+                    
+                    local words = {}
+                    for word in string.gmatch(query, "%S+") do
+                        TableInsert(words, word)
+                    end
+                    
+                    if #words > 0 then
+                        for _, word in ipairs(words) do
+                            if StringFind(name, word, 1, true) then
+                                return true
+                            end
+                        end
+                    end
+                    
+                    return false
+                end
+
                 local function UpdateSearch()
                     local success, err = pcall(function()
                         local query = StringLower(Items["SearchInput"].Instance.Text)
                         
                         -- Limpa os botões de busca anteriores no scroll
                         for _, child in ipairs(SearchPopup.Scroll.Instance:GetChildren()) do
-                            if child:IsA("TextButton") then
+                            if child:IsA("TextButton") or child:IsA("TextLabel") then
                                 child:Destroy()
                             end
                         end
@@ -2106,10 +2132,15 @@ do
                             return
                         end
 
+                        -- Abre a interface imediatamente ao começar a digitar para dar feedback ao usuário
+                        if not SearchPopup.Overlay.Instance.Visible then
+                            SearchPopup:Open()
+                        end
+
                         local matchesCount = 0
 
                         for _, data in ipairs(Window.SearchableElements) do
-                            local matches = StringFind(StringLower(data.Name or ""), query, 1, true) ~= nil
+                            local matches = MatchQuery(data.Name or "", query)
                             if matches then
                                 matchesCount = matchesCount + 1
 
@@ -2180,12 +2211,20 @@ do
                             end
                         end
 
-                        if matchesCount > 0 then
-                            if not SearchPopup.Overlay.Instance.Visible then
-                                SearchPopup:Open()
-                            end
-                        else
-                            SearchPopup:Close()
+                        -- Se não houver nenhum resultado correspondente, exibe uma resposta limpa na tela
+                        if matchesCount == 0 then
+                            local NoResults = Instances:Create("TextLabel", {
+                                Parent = SearchPopup.Scroll.Instance,
+                                Text = "Nenhum resultado encontrado.",
+                                FontFace = Library.Font,
+                                TextColor3 = Library.Theme.Text,
+                                TextTransparency = 0.5,
+                                TextSize = 14,
+                                Size = UDim2New(1, 0, 0, 50),
+                                BackgroundTransparency = 1,
+                                TextXAlignment = Enum.TextXAlignment.Center,
+                                ZIndex = 25004
+                            })
                         end
                     end)
                     if not success then
