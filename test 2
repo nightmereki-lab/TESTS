@@ -1,4 +1,34 @@
+Esse erro (attempt to call a nil value) na linha 4 do seu script de execução
+significa que a função loadstring() não conseguiu compilar o código da
+biblioteca que está hospedada no seu GitHub e, por isso, retornou nil.
 
+O motivo disso é que a versão anterior continha um pequeno erro de digitação de
+sintaxe (um caractere incorreto) na função de pesquisa interna do Dropdown.
+
+Onde estava o erro:
+
+Dentro de Library.Sections.Dropdown, a função de filtragem continha chaves { ...
+} em vez de declarar a variável local:
+
+-- Como estava (Incorreto - Gerava erro de sintaxe no compilador):
+{ matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil }
+item.Button.Instance.Visible = matches
+
+-- Como deve ser (Correto):
+local matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil
+item.Button.Instance.Visible = matches
+
+Como o compilador do Luau encontrou essa instrução inválida, ele rejeitou o
+código inteiro.
+
+Solução:
+
+Para corrigir, substitua todo o conteúdo do seu arquivo no GitHub
+(https://raw.githubusercontent.com/nightmereki-lab/TESTS/refs/heads/main/test%202)
+pelo código completo e corrigido abaixo.
+
+Assim que você atualizar o arquivo no seu repositório, o seu script de teste
+carregará normalmente.
 
 if getgenv().Library then
     getgenv().Library:Unload()
@@ -758,10 +788,11 @@ do
                 Parent = NotificationParent.Instance, 
                 Size = UDim2New(1, 0, 0, 0),
                 Position = UDim2New(1, -55, 0, 0),
-                BackgroundColor3 = FromRGB(25, 25, 25),
+                BackgroundColor3 = FromRGB(255, 255, 255),
                 BackgroundTransparency = 0,
                 AutomaticSize = Enum.AutomaticSize.Y
             })
+            NotificationFrame.Instance.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
             Instances:Create("UICorner", { Parent = NotificationFrame.Instance, CornerRadius = UDimNew(0, 10) })
             
             local UIStroke = Instances:Create("UIStroke", {
@@ -1359,22 +1390,6 @@ do
             end)
         end
 
-        function Colorpicker:Set(Color)
-            if type(Color) == "table" then
-                Color = FromRGB(Color[1], Color[2], Color[3])
-            elseif type(Color) == "string" then
-                Color = FromHex(Color)
-            end 
-
-            Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = Color:ToHSV()
-            local PaletteValueX = MathClamp(Colorpicker.Saturation, 0, 1)
-            local PaletteValueY = MathClamp(1 - Colorpicker.Value, 0, 1)
-
-            Items["PaletteDragger"].Instance.Position = UDim2New(PaletteValueX, 0, PaletteValueY, 0)
-            Items["HueDragger"].Instance.Position = UDim2New(0, 0, Colorpicker.Hue, 0)
-            Colorpicker:Update()
-        end
-
         Items["ColorpickerButton"]:Connect("MouseButton1Down", function()
             Colorpicker:SetOpen(not Colorpicker.IsOpen)
         end)
@@ -1469,8 +1484,8 @@ do
                 TextColor3 = Library.Theme["Text"],
                 TextTransparency = 0.5,
                 Text = "[C]",
-                Active = true,
                 AutoButtonColor = false,
+                Active = true,
                 Size = UDim2New(0, 0, 1, 0),
                 BackgroundTransparency = 1,
                 BorderSizePixel = 0,
@@ -2692,6 +2707,7 @@ do
             return Window
         end
 
+        local Active = false
         Library.Page = function(self, Data)
             Data = Data or {}
 
@@ -3152,7 +3168,7 @@ do
                         local q = StringLower(DropdownSearchInput.Instance.Text)
                         for _, item in ipairs(itemButtons) do
                             if item.Button and item.Button.Instance then
-                                { matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil }
+                                local matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil
                                 item.Button.Instance.Visible = matches
                             end
                         end
