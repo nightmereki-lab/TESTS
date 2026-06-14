@@ -66,6 +66,13 @@ do
     local ipairs = ipairs
     local pairs = pairs
 
+    -- Fallback compatível para table.clear (previne falhas em executores antigos)
+    local TableClear = table.clear or function(t)
+        for k in pairs(t) do
+            t[k] = nil
+        end
+    end
+
     Library = {
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
@@ -324,7 +331,6 @@ do
             end
         end
 
-        -- SISTEMA DE ARRASTE CORRIGIDO (DIFERENÇA DE ANCHORPOINT E SCALE COMPENSADOS)
         Instances.MakeDraggable = function(self)
             if not self.Instance then return end
         
@@ -1361,13 +1367,13 @@ do
             Always = Items["Always"]
         }
 
-        local Debounce = false
+        local Bounce = false
         local RenderStepped  
 
         function Keybind:SetOpen(Bool)
-            if Debounce then return end
+            if Bounce then return end
             Keybind.IsOpen = Bool
-            Debounce = true 
+            Bounce = true 
 
             if Keybind.IsOpen then 
                 Items["KeybindWindow"].Instance.Visible = true
@@ -1413,7 +1419,7 @@ do
             end
             
             NewTween.Tween.Completed:Connect(function()
-                Debounce = false 
+                Bounce = false 
                 Items["KeybindWindow"].Instance.Visible = Keybind.IsOpen
                 task_wait(0.2)
                 Items["KeybindWindow"].Instance.Parent = not Keybind.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
@@ -1972,46 +1978,56 @@ do
                 }):AddToTheme({TextColor3 = 'Text'})
 
                 local function UpdateSearch()
-                    local query = StringLower(Items["SearchInput"].Instance.Text)
-                    local sectionsWithVisibleElements = {}
+                    local success, err = pcall(function()
+                        local query = StringLower(Items["SearchInput"].Instance.Text)
+                        local sectionsWithVisibleElements = {}
 
-                    for _, data in ipairs(Window.SearchableElements) do
-                        local matches = query == "" or StringFind(StringLower(data.Name), query, 1, true) ~= nil
-                        data.Element.Visible = matches
-                        
-                        if matches then
-                            sectionsWithVisibleElements[data.Section] = true
-                        end
-                    end
-
-                    for _, Page in ipairs(Window.Pages) do
-                        if Page.Sections then
-                            for _, Section in ipairs(Page.Sections) do
-                                if query == "" then
-                                    Section.Items["SectionOutline"].Instance.Visible = true
-                                else
-                                    Section.Items["SectionOutline"].Instance.Visible = sectionsWithVisibleElements[Section] == true
-                                end
-                            end
-                        end
-                    end
-
-                    -- Mudança de página/aba automática ao digitar uma busca válida
-                    if query ~= "" then
                         for _, data in ipairs(Window.SearchableElements) do
-                            local matches = StringFind(StringLower(data.Name), query, 1, true) ~= nil
-                            if matches then
-                                for _, p in ipairs(Window.Pages) do
-                                    p:Turn(p == data.Page)
+                            if data.Element and data.Element.Parent then
+                                local matches = query == "" or StringFind(StringLower(data.Name or ""), query, 1, true) ~= nil
+                                data.Element.Visible = matches
+                                
+                                if matches then
+                                    sectionsWithVisibleElements[data.Section] = true
                                 end
-                                break
                             end
                         end
+
+                        for _, Page in ipairs(Window.Pages) do
+                            if Page.Sections then
+                                for _, Section in ipairs(Page.Sections) do
+                                    if Section.Items and Section.Items["SectionOutline"] and Section.Items["SectionOutline"].Instance then
+                                        if query == "" then
+                                            Section.Items["SectionOutline"].Instance.Visible = true
+                                        else
+                                            Section.Items["SectionOutline"].Instance.Visible = sectionsWithVisibleElements[Section] == true
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        -- Mudança de página/aba automática ao digitar uma busca válida
+                        if query ~= "" then
+                            for _, data in ipairs(Window.SearchableElements) do
+                                local matches = StringFind(StringLower(data.Name or ""), query, 1, true) ~= nil
+                                if matches and data.Page then
+                                    for _, p in ipairs(Window.Pages) do
+                                        p:Turn(p == data.Page)
+                                    end
+                                    break
+                                end
+                            end
+                        end
+                    end)
+                    if not success then
+                        warn("Erro na pesquisa: " .. tostring(err))
                     end
                 end
 
-                -- Correção: Conexão direta no TextBox nativo para a busca global
+                -- Correção e Redundância: Conexão direta e robusta para atualização em tempo real
                 Items["SearchInput"].Instance:GetPropertyChangedSignal("Text"):Connect(UpdateSearch)
+                Items["SearchInput"].Instance.FocusLost:Connect(UpdateSearch)
                 
                 Items["Pages"] = Instances:Create("ScrollingFrame", {
                     Parent = Items["Sidebar"].Instance,
@@ -2423,7 +2439,7 @@ do
             return Slider 
         end
 
-        -- DROPDOWN COM PESQUISA INTERNA ATIVADA NATIVAMENTE
+        -- DROPDOWN COM PESQUISA INTERNA ATIVADA NATIVAMENTE (CORRIGIDO)
         Library.Sections.Dropdown = function(self, Data)
             Data = Data or {}
             local Dropdown = {Section = self, Name = Data.Name or "Dropdown", Items = Data.Items or {}, Flag = Data.Flag or Library:NextFlag(), Callback = Data.Callback or function() end, Open = false, Locked = Data.Lock or false}
@@ -2485,15 +2501,23 @@ do
                 local itemButtons = {}
 
                 local function FilterDropdownItems()
-                    local q = StringLower(DropdownSearchInput.Instance.Text)
-                    for _, item in ipairs(itemButtons) do
-                        local matches = q == "" or StringFind(StringLower(item.Name), q, 1, true) ~= nil
-                        item.Button.Instance.Visible = matches
+                    local success, err = pcall(function()
+                        local q = StringLower(DropdownSearchInput.Instance.Text)
+                        for _, item in ipairs(itemButtons) do
+                            if item.Button and item.Button.Instance then
+                                local matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil
+                                item.Button.Instance.Visible = matches
+                            end
+                        end
+                    end)
+                    if not success then
+                        warn("Erro no filtro do dropdown: " .. tostring(err))
                     end
                 end
 
-                -- Correção: Registro direto no GetPropertyChangedSignal do TextBox nativo
+                -- Correção e Redundância: Registro direto e robusto no TextBox nativo do Dropdown
                 DropdownSearchInput.Instance:GetPropertyChangedSignal("Text"):Connect(FilterDropdownItems)
+                DropdownSearchInput.Instance.FocusLost:Connect(FilterDropdownItems)
 
                 Items["Lock"] = Instances:Create("Frame", {
                     Parent = Items["Main"].Instance,
@@ -2512,7 +2536,7 @@ do
                     for _,v in pairs(Items["Container"].Instance:GetChildren()) do 
                         if v:IsA("TextButton") then v:Destroy() end 
                     end
-                    table.clear(itemButtons)
+                    TableClear(itemButtons) -- Fallback seguro de limpeza
 
                     for _,v in ipairs(newList) do 
                         local b = Instances:Create("TextButton", {
