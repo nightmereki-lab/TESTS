@@ -72,11 +72,20 @@ do
         end
     end
 
+    local BadgeDescriptions = {
+        BUG  = "Esta função não está funcionando perfeitamente e pode conter falhas técnicas.",
+        RISK = "Esta função possui risco de banimento vinculado. A punição não é garantida, mas recomendamos cautela.",
+        TEST = "Função em fase de testes. Ainda não foi completamente testada, podendo causar erros ou banimento.",
+        SAFE = "Função recomendada e segura para uso. Projetada para minimizar o risco de banimento.",
+        NEW  = "Nova função recentemente adicionada, totalmente testada, aprovada e segura para uso.",
+        VIP  = "Função exclusiva destinada apenas aos usuários que possuem o plano VIP/Premium."
+    }
+
     Library = {
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         Flags = {},
-        IsInteracting = false, -- Flag para evitar que a interface se mova ao usar controles
+        IsInteracting = false, -- Flag global para gerenciar prioridade de arrastes na tela
         Tween = {
             Time = 0.2,
             Style = Enum.EasingStyle.Circular,
@@ -106,12 +115,12 @@ do
         CurrentPopupZIndex = 20000,
 
         BadgeColors = {
-            BUG  = FromRGB(255, 70, 70),
-            RISK = FromRGB(255, 230, 0),
-            TEST = FromRGB(255, 140, 0),
-            SAFE = FromRGB(160, 50, 255),
-            NEW  = FromRGB(0, 255, 130),
-            VIP  = FromRGB(0, 160, 255)
+            BUG  = FromRGB(255, 75, 75),     -- Vermelho
+            RISK = FromRGB(255, 215, 0),    -- Amarelo
+            TEST = FromRGB(255, 140, 0),    -- Laranja
+            SAFE = FromRGB(160, 50, 255),   -- Roxo
+            NEW  = FromRGB(46, 204, 113),   -- Verde
+            VIP  = FromRGB(52, 152, 219)    -- Azul
         }
     }
 
@@ -339,7 +348,7 @@ do
             local DragStart, StartPos
         
             self:Connect("InputBegan", function(Input)
-                if Library.IsInteracting then return end -- Cancela arrasto se estiver mexendo em sliders/controles
+                if Library.IsInteracting then return end -- Bloqueia arraste se houver interação ativa
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
                     DragStart = Input.Position
@@ -423,7 +432,7 @@ do
 
             local BeginResizing = function(Side)
                 Resizing = true 
-                Library.IsInteracting = true -- Trava movimentação da interface
+                Library.IsInteracting = true
                 CurrentSide = Side 
                 StartMouse = UserInputService:GetMouseLocation()
                 StartPosition = Vector2New(Gui.Position.X.Offset, Gui.Position.Y.Offset)
@@ -436,7 +445,7 @@ do
 
             local EndResizing = function()
                 Resizing = false 
-                Library.IsInteracting = false -- Destrava movimentação da interface
+                Library.IsInteracting = false
                 CurrentSide = nil
                 for _, Value in ipairs(Edges) do 
                     Value.Button.Instance.BackgroundTransparency = 1
@@ -551,24 +560,46 @@ do
             Parent = Overlay.Instance,
             AnchorPoint = Vector2New(0.5, 0.5),
             Position = UDim2New(0.5, 0, 0.45, 0),
-            Size = UDim2New(0, 340, 0, 200),
+            Size = UDim2New(0, 360, 0, 240),
             BackgroundColor3 = Library.Theme.Background,
             BorderSizePixel = 0,
             ZIndex = baseZIndex + 1,
             ClipsDescendants = true
         })
-        Instances:Create("UICorner", { Parent = Container.Instance, CornerRadius = UDimNew(0, 8) })
+        Instances:Create("UICorner", { Parent = Container.Instance, CornerRadius = UDimNew(0, 10) })
         Instances:Create("UIStroke", { Parent = Container.Instance, Color = BadgeColor, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Transparency = 0.1 })
+
+        local Glow = Instances:Create("ImageLabel", {
+            Parent = Container.Instance,
+            Size = UDim2New(1, 40, 1, 40),
+            Position = UDim2New(0.5, 0, 0.5, 0),
+            AnchorPoint = Vector2New(0.5, 0.5),
+            BackgroundTransparency = 1,
+            Image = "rbxassetid://13110323315",
+            ImageColor3 = BadgeColor,
+            ImageTransparency = 0.85,
+            ZIndex = baseZIndex
+        })
 
         local Header = Instances:Create("TextLabel", {
             Parent = Container.Instance,
-            Text = StringFormat("[%s] %s", BadgeType, Title),
+            Text = StringFormat("[%s] - %s", BadgeType, Title),
             FontFace = Library.Font,
             TextColor3 = BadgeColor,
             TextSize = 18,
-            Size = UDim2New(1, 0, 0, 45),
+            Size = UDim2New(1, 0, 0, 50),
             BackgroundTransparency = 1,
             TextXAlignment = Enum.TextXAlignment.Center,
+            ZIndex = baseZIndex + 2
+        })
+
+        local Separator = Instances:Create("Frame", {
+            Parent = Container.Instance,
+            Size = UDim2New(0.85, 0, 0, 1),
+            Position = UDim2New(0.075, 0, 0, 50),
+            BackgroundColor3 = BadgeColor,
+            BackgroundTransparency = 0.6,
+            BorderSizePixel = 0,
             ZIndex = baseZIndex + 2
         })
 
@@ -577,9 +608,9 @@ do
             Text = Description or "Sem detalhes adicionais disponíveis.",
             FontFace = Library.Font,
             TextColor3 = Library.Theme.Text,
-            TextSize = 15,
-            Position = UDim2New(0, 20, 0, 50),
-            Size = UDim2New(1, -40, 1, -100),
+            TextSize = 14,
+            Position = UDim2New(0, 25, 0, 65),
+            Size = UDim2New(1, -50, 1, -135),
             BackgroundTransparency = 1,
             TextWrapped = true,
             TextYAlignment = Enum.TextYAlignment.Top,
@@ -588,21 +619,21 @@ do
 
         local Close = Instances:Create("TextButton", {
             Parent = Container.Instance,
-            Text = "FECHAR",
+            Text = "COMPREENDIDO",
             FontFace = Library.Font,
             TextColor3 = FromRGB(255, 255, 255),
             BackgroundColor3 = BadgeColor,
             Active = true,
-            Size = UDim2New(0, 120, 0, 35),
-            Position = UDim2New(0.5, -60, 1, -45),
+            Size = UDim2New(0, 140, 0, 36),
+            Position = UDim2New(0.5, -70, 1, -50),
             BorderSizePixel = 0,
             ZIndex = baseZIndex + 3
         })
         Instances:Create("UICorner", { Parent = Close.Instance, CornerRadius = UDimNew(0, 6) })
 
-        Container.Instance.Size = UDim2New(0, 238, 0, 140)
+        Container.Instance.Size = UDim2New(0, 252, 0, 168)
         TweenService:Create(Overlay.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.65}):Play()
-        TweenService:Create(Container.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 340, 0, 200), Position = UDim2New(0.5, 0, 0.5, 0)}):Play()
+        TweenService:Create(Container.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 360, 0, 240), Position = UDim2New(0.5, 0, 0.5, 0)}):Play()
 
         Close:Connect("MouseEnter", function()
             TweenService:Create(Close.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BadgeColor:Lerp(Color3.new(1, 1, 1), 0.15)}):Play()
@@ -624,37 +655,39 @@ do
         
         local BType = Data.Badge:upper()
         local BColor = Library.BadgeColors[BType] or Library.Theme.Accent
+        local BDesc = BadgeDescriptions[BType] or Data.BadgeDescription or "Sem detalhes adicionais sobre esta tag."
         
         local Badge = Instances:Create("TextButton", {
             Parent = Parent,
             Text = BType,
             FontFace = Library.Font,
             TextSize = 10,
-            TextColor3 = FromRGB(255, 255, 255),
+            TextColor3 = BColor,
             BackgroundColor3 = BColor,
+            BackgroundTransparency = 0.85,
             Active = true,
             Size = UDim2New(0, 42, 0, 16),
             Position = UDim2New(0, Parent.TextBounds.X + 10, 0.5, -8),
             BorderSizePixel = 0,
-            AutoButtonColor = true
+            AutoButtonColor = false
         })
         Instances:Create("UICorner", { Parent = Badge.Instance, CornerRadius = UDimNew(0, 4) })
         
         local stroke = Instances:Create("UIStroke", {
             Parent = Badge.Instance,
-            Color = FromRGB(255, 255, 255),
-            Transparency = 0.85,
+            Color = BColor,
+            Transparency = 0.6,
             Thickness = 1,
             ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         })
 
         Badge:Connect("MouseEnter", function()
-            TweenService:Create(Badge.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BColor:Lerp(Color3.new(1,1,1), 0.15)}):Play()
-            TweenService:Create(stroke.Instance, TweenInfo.new(0.15), {Transparency = 0.5}):Play()
+            TweenService:Create(Badge.Instance, TweenInfo.new(0.15), {BackgroundTransparency = 0.7}):Play()
+            TweenService:Create(stroke.Instance, TweenInfo.new(0.15), {Transparency = 0.2}):Play()
         end)
         Badge:Connect("MouseLeave", function()
-            TweenService:Create(Badge.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BColor}):Play()
-            TweenService:Create(stroke.Instance, TweenInfo.new(0.15), {Transparency = 0.85}):Play()
+            TweenService:Create(Badge.Instance, TweenInfo.new(0.15), {BackgroundTransparency = 0.85}):Play()
+            TweenService:Create(stroke.Instance, TweenInfo.new(0.15), {Transparency = 0.6}):Play()
         end)
         
         local function updatePos()
@@ -669,7 +702,7 @@ do
         updatePos()
         
         Badge:Connect("MouseButton1Click", function()
-            Library:CreateInfoPopup(Data.Name or "Informação", Data.BadgeDescription or "Este recurso possui a tag "..BType..". Use com cautela.", BType)
+            Library:CreateInfoPopup(Data.Name or "Informação", BDesc, BType)
         end)
         
         return Badge
@@ -706,7 +739,6 @@ do
         SortOrder = Enum.SortOrder.LayoutOrder
     })
 
-    -- NOVA NOTIFICAÇÃO (PORTADO DO MODELO EXECUTADO)
     function Library:Notify(NotificationConfig)
         NotificationConfig = NotificationConfig or {}
         local Name = NotificationConfig.Name or NotificationConfig.Title or "Notification"
@@ -2516,7 +2548,11 @@ do
                 })
                 
                 local function RefreshConfigs()
-                    local files = listfiles(Library.Folders.Configs)
+                    local success, files = pcall(listfiles, Library.Folders.Configs)
+                    if not success then
+                        ConfigDropdown:Refresh({"Erro ao ler pasta"})
+                        return
+                    end
                     local cleanFiles = {}
                     for _, file in ipairs(files) do
                         if file:sub(-5) == ".json" then
@@ -2538,8 +2574,12 @@ do
                             return
                         end
                         local rawData = Library:GetConfig()
-                        writefile(Library.Folders.Configs .. "/" .. name .. ".json", rawData)
-                        Library:Notify({Title = "Configurações", Content = "Configuração '" .. name .. "' salva com sucesso!", Duration = 4, Type = "SAFE"})
+                        local ok, err = pcall(writefile, Library.Folders.Configs .. "/" .. name .. ".json", rawData)
+                        if ok then
+                            Library:Notify({Title = "Configurações", Content = "Configuração '" .. name .. "' salva com sucesso!", Duration = 4, Type = "SAFE"})
+                        else
+                            Library:Notify({Title = "Erro", Content = "Falha ao gravar arquivo: " .. tostring(err), Duration = 5, Type = "BUG"})
+                        end
                         RefreshConfigs()
                     end
                 })
@@ -2995,7 +3035,7 @@ do
             Items["Bar"]:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
-                    Library.IsInteracting = true -- Trava movimentação da interface
+                    Library.IsInteracting = true -- Bloqueia arraste da tela
                     TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 14, 0, 14)}):Play()
                     Update()
                 end
@@ -3011,7 +3051,7 @@ do
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     if Dragging then
                         Dragging = false
-                        Library.IsInteracting = false -- Destrava movimentação da interface
+                        Library.IsInteracting = false -- Libera arraste da tela
                         TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 12, 0, 12)}):Play()
                     end
                 end
