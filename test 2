@@ -348,7 +348,7 @@ do
             local DragStart, StartPos
         
             self:Connect("InputBegan", function(Input)
-                if Library.IsInteracting then return end 
+                if Library.IsInteracting then return end -- Bloqueia arraste se o usuário estiver arrastando sliders/colorpickers
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
                     DragStart = Input.Position
@@ -2685,10 +2685,11 @@ do
                 Window.MinimizeButton = ToggleButton
             end
 
-            Window:AddConfigPage()
+            setmetatable(Window, Library)
+            Window:AddConfigPage() -- Inicializa as configurações após a metatabela estar registrada
 
             Window:SetOpen(true)
-            return setmetatable(Window, Library)
+            return Window
         end
 
         Library.Page = function(self, Data)
@@ -3151,7 +3152,7 @@ do
                         local q = StringLower(DropdownSearchInput.Instance.Text)
                         for _, item in ipairs(itemButtons) do
                             if item.Button and item.Button.Instance then
-                                local matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil
+                                { matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil }
                                 item.Button.Instance.Visible = matches
                             end
                         end
