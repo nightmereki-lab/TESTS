@@ -85,7 +85,7 @@ do
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         Flags = {},
-        IsInteracting = false, -- Gerencia estados de arraste para evitar conflito com a janela
+        IsInteracting = false, -- Gerencia estados de arraste para evitar conflitos de arrastar janela
         Tween = {
             Time = 0.2,
             Style = Enum.EasingStyle.Circular,
@@ -348,7 +348,7 @@ do
             local DragStart, StartPos
         
             self:Connect("InputBegan", function(Input)
-                if Library.IsInteracting then return end -- Bloqueia arraste se o usuário estiver arrastando sliders/colorpickers
+                if Library.IsInteracting then return end 
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
                     DragStart = Input.Position
@@ -758,11 +758,10 @@ do
                 Parent = NotificationParent.Instance, 
                 Size = UDim2New(1, 0, 0, 0),
                 Position = UDim2New(1, -55, 0, 0),
-                BackgroundColor3 = FromRGB(255, 255, 255),
+                BackgroundColor3 = FromRGB(25, 25, 25),
                 BackgroundTransparency = 0,
                 AutomaticSize = Enum.AutomaticSize.Y
             })
-            NotificationFrame.Instance.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
             Instances:Create("UICorner", { Parent = NotificationFrame.Instance, CornerRadius = UDimNew(0, 10) })
             
             local UIStroke = Instances:Create("UIStroke", {
@@ -1256,6 +1255,23 @@ do
             if Data.Callback then 
                 Library:SafeCall(Data.Callback, Colorpicker.Color)
             end
+        end
+
+        -- RESTAURADO MÉTODO :Set()
+        function Colorpicker:Set(Color)
+            if type(Color) == "table" then
+                Color = FromRGB(Color[1], Color[2], Color[3])
+            elseif type(Color) == "string" then
+                Color = FromHex(Color)
+            end 
+
+            Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = Color:ToHSV()
+            local PaletteValueX = MathClamp(Colorpicker.Saturation, 0, 1)
+            local PaletteValueY = MathClamp(1 - Colorpicker.Value, 0, 1)
+
+            Items["PaletteDragger"].Instance.Position = UDim2New(PaletteValueX, 0, PaletteValueY, 0)
+            Items["HueDragger"].Instance.Position = UDim2New(0, 0, Colorpicker.Hue, 0)
+            Colorpicker:Update()
         end
 
         function Colorpicker:SlidePalette(Input)
@@ -2946,6 +2962,7 @@ do
             return Toggle 
         end
 
+        local Active = false
         Library.Sections.Button = function(self, Data)
             Data = Data or {}
             local Button = {Section = self, Name = Data.Name or "Button", Callback = Data.Callback or function() end}
@@ -3268,6 +3285,11 @@ do
                 
                 CPItems["ColorpickerButton"].Instance.AnchorPoint = Vector2New(1, 0.5)
                 CPItems["ColorpickerButton"].Instance.Position = UDim2New(1, 0, 0.5, 0)
+
+                -- EXPOSTO MÉTODO PÚBLICO :Set() PARA O WRAPPER
+                function Colorpicker:Set(Color)
+                    CP:Set(Color)
+                end
             end
             
             Colorpicker.Section.Window:RegisterElement(Items["Main"].Instance, "Colorpicker", Colorpicker.Name, Colorpicker.Section, Colorpicker.Section.Page)
