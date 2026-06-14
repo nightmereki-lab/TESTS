@@ -66,7 +66,6 @@ do
     local ipairs = ipairs
     local pairs = pairs
 
-    -- Fallback compatível para table.clear (previne falhas em executores antigos)
     local TableClear = table.clear or function(t)
         for k in pairs(t) do
             t[k] = nil
@@ -103,17 +102,15 @@ do
         UnusedHolder = nil,
         Font = nil,
         
-        -- Controle de empilhamento de popups
         CurrentPopupZIndex = 20000,
 
-        -- Cores das Badges
         BadgeColors = {
-            BUG  = FromRGB(255, 70, 70),    -- Vermelho
-            RISK = FromRGB(255, 230, 0),   -- Amarelo
-            TEST = FromRGB(255, 140, 0),   -- Laranja
-            SAFE = FromRGB(160, 50, 255),  -- Roxo
-            NEW  = FromRGB(0, 255, 130),    -- Verde
-            VIP  = FromRGB(0, 160, 255)     -- Azul
+            BUG  = FromRGB(255, 70, 70),
+            RISK = FromRGB(255, 230, 0),
+            TEST = FromRGB(255, 140, 0),
+            SAFE = FromRGB(160, 50, 255),
+            NEW  = FromRGB(0, 255, 130),
+            VIP  = FromRGB(0, 160, 255)
         }
     }
 
@@ -233,7 +230,6 @@ do
         end
 
         Tween.GetProperty = function(self, Item)
-            Item = Item or self.Item 
             if Item:IsA("Frame") then
                 return { "BackgroundTransparency" }
             elseif Item:IsA("TextLabel") or Item:IsA("TextButton") then
@@ -334,7 +330,6 @@ do
             end
         end
 
-        -- SISTEMA DE ARRASTE CORRIGIDO (DIFERENÇA DE ANCHORPOINT E SCALE COMPENSADOS)
         Instances.MakeDraggable = function(self)
             if not self.Instance then return end
         
@@ -352,7 +347,6 @@ do
                         ParentPos = Gui.Parent.AbsolutePosition
                     end
                     
-                    -- Calcula o Offset equivalente absoluto para evitar saltos ou "snapping"
                     local RelativePos = Gui.AbsolutePosition - ParentPos
                     local AdjustedX = RelativePos.X + (Gui.AbsoluteSize.X * Gui.AnchorPoint.X)
                     local AdjustedY = RelativePos.Y + (Gui.AbsoluteSize.Y * Gui.AnchorPoint.Y)
@@ -371,7 +365,6 @@ do
                     local ParentSize = (Gui.Parent and (Gui.Parent:IsA("GuiObject") or Gui.Parent:IsA("LayerCollector"))) and Gui.Parent.AbsoluteSize or Camera.ViewportSize
                     local GuiSize = Gui.AbsoluteSize
                     
-                    -- Limites de tela dinâmicos respeitando os pontos de ancoragem
                     local MinX = GuiSize.X * Gui.AnchorPoint.X
                     local MaxX = ParentSize.X - (GuiSize.X * (1 - Gui.AnchorPoint.X))
                     local MinY = GuiSize.Y * Gui.AnchorPoint.Y
@@ -532,11 +525,9 @@ do
         })
     end
 
-    -- POPUP DE BADGES (SOBREPOSIÇÃO DINÂMICA DE POPUPS CORRIGIDA)
     function Library:CreateInfoPopup(Title, Description, BadgeType)
         local BadgeColor = Library.BadgeColors[BadgeType] or Library.Theme.Accent
         
-        -- Incrementa o ZIndex Global para garantir empilhamento perfeito
         Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 10
         local baseZIndex = Library.CurrentPopupZIndex
 
@@ -557,7 +548,8 @@ do
             Size = UDim2New(0, 340, 0, 200),
             BackgroundColor3 = Library.Theme.Background,
             BorderSizePixel = 0,
-            ZIndex = baseZIndex + 1
+            ZIndex = baseZIndex + 1,
+            ClipsDescendants = true
         })
         Instances:Create("UICorner", { Parent = Container.Instance, CornerRadius = UDimNew(0, 8) })
         Instances:Create("UIStroke", { Parent = Container.Instance, Color = BadgeColor, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Transparency = 0.1 })
@@ -601,12 +593,10 @@ do
         })
         Instances:Create("UICorner", { Parent = Close.Instance, CornerRadius = UDimNew(0, 6) })
 
-        -- Animação de Entrada
         Container.Instance.Size = UDim2New(0, 0, 0, 0)
         TweenService:Create(Overlay.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.65}):Play()
         TweenService:Create(Container.Instance, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 340, 0, 200)}):Play()
 
-        -- Hover dinâmico no botão
         Close:Connect("MouseEnter", function()
             TweenService:Create(Close.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BadgeColor:Lerp(Color3.new(1, 1, 1), 0.15)}):Play()
         end)
@@ -642,7 +632,6 @@ do
         })
         Instances:Create("UICorner", { Parent = Badge.Instance, CornerRadius = UDimNew(0, 4) })
         
-        -- Evento dinâmico para corrigir o posicionamento após a renderização do texto
         local function updatePos()
             if Parent and Parent.Parent then
                 Badge.Instance.Position = UDim2New(0, Parent.TextBounds.X + 10, 0.5, -8)
@@ -856,7 +845,7 @@ do
     end
 
     Library.IsMouseOverFrame = function(self, Frame)
-        Frame = Frame.Instance
+        Frame = Frame.Instance or Frame
         local MousePosition = Vector2New(Mouse.X, Mouse.Y)
         return MousePosition.X >= Frame.AbsolutePosition.X and MousePosition.X <= Frame.AbsolutePosition.X + Frame.AbsoluteSize.X 
         and MousePosition.Y >= Frame.AbsolutePosition.Y and MousePosition.Y <= Frame.AbsolutePosition.Y + Frame.AbsoluteSize.Y
@@ -1135,12 +1124,25 @@ do
                         if RenderStepped then RenderStepped:Disconnect() RenderStepped = nil end
                         return
                     end
-                    Items["ColorpickerWindow"].Instance.Position = UDim2New(
-                        0, 
-                        Items["ColorpickerButton"].Instance.AbsolutePosition.X, 
-                        0, 
-                        Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 5
-                    )
+                    local buttonPos = Items["ColorpickerButton"].Instance.AbsolutePosition
+                    local buttonSize = Items["ColorpickerButton"].Instance.AbsoluteSize
+                    local windowSize = Items["ColorpickerWindow"].Instance.AbsoluteSize
+                    local viewportSize = Camera.ViewportSize
+
+                    local posX = buttonPos.X
+                    local posY = buttonPos.Y + buttonSize.Y + 5
+
+                    if posX + windowSize.X > viewportSize.X then
+                        posX = viewportSize.X - windowSize.X - 10
+                    end
+                    if posX < 10 then posX = 10 end
+
+                    if posY + windowSize.Y > viewportSize.Y then
+                        posY = buttonPos.Y - windowSize.Y - 5
+                    end
+                    if posY < 10 then posY = 10 end
+
+                    Items["ColorpickerWindow"].Instance.Position = UDim2New(0, posX, 0, posY)
                 end)
 
                 for Value, _ in pairs(Library.OpenFrames) do 
@@ -1388,12 +1390,29 @@ do
                 Items["KeybindWindow"].Instance.Parent = Library.Holder.Instance
                 
                 RenderStepped = RunService.RenderStepped:Connect(function()
-                    Items["KeybindWindow"].Instance.Position = UDim2New(
-                        0, 
-                        Items["KeyButton"].Instance.AbsolutePosition.X, 
-                        0, 
-                        Items["KeyButton"].Instance.AbsolutePosition.Y + Items["KeyButton"].Instance.AbsoluteSize.Y + 5
-                    )
+                    if not Items["KeyButton"].Instance or not Items["KeyButton"].Instance.Parent then
+                        if RenderStepped then RenderStepped:Disconnect() RenderStepped = nil end
+                        return
+                    end
+                    local buttonPos = Items["KeyButton"].Instance.AbsolutePosition
+                    local buttonSize = Items["KeyButton"].Instance.AbsoluteSize
+                    local windowSize = Items["KeybindWindow"].Instance.AbsoluteSize
+                    local viewportSize = Camera.ViewportSize
+
+                    local posX = buttonPos.X
+                    local posY = buttonPos.Y + buttonSize.Y + 5
+
+                    if posX + windowSize.X > viewportSize.X then
+                        posX = viewportSize.X - windowSize.X - 10
+                    end
+                    if posX < 10 then posX = 10 end
+
+                    if posY + windowSize.Y > viewportSize.Y then
+                        posY = buttonPos.Y - windowSize.Y - 5
+                    end
+                    if posY < 10 then posY = 10 end
+
+                    Items["KeybindWindow"].Instance.Position = UDim2New(0, posX, 0, posY)
                 end)
 
                 for Value, _ in pairs(Library.OpenFrames) do 
@@ -1676,7 +1695,8 @@ do
                 Items = {},
                 IsOpen = false,
                 MinimizeButton = nil,
-                SearchableElements = {}
+                SearchableElements = {},
+                ScaleObj = nil
             }
 
             function Window:RegisterElement(Element, Type, Name, Section, Page)
@@ -1707,6 +1727,11 @@ do
                     Parent = Items["MainFrame"].Instance,
                     CornerRadius = UDimNew(0, 8)
                 })
+
+                local ScaleObj = InstanceNew("UIScale")
+                ScaleObj.Parent = Items["MainFrame"].Instance
+                ScaleObj.Scale = 1
+                Window.ScaleObj = ScaleObj
                 
                 Items["Sidebar"] = Instances:Create("Frame", {
                     Parent = Items["MainFrame"].Instance,
@@ -1794,14 +1819,20 @@ do
 
                 local function toggleAnonymousMenu()
                     if currentDialog then
-                        currentDialog:Destroy()
+                        local oldDialog = currentDialog
                         currentDialog = nil
+                        local closeTween = TweenService:Create(oldDialog, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2New(0, 0, 0, 0)})
+                        closeTween:Play()
+                        closeTween.Completed:Connect(function()
+                            oldDialog:Destroy()
+                        end)
                         return
                     end
 
                     local dialog = InstanceNew("Frame")
                     dialog.Name = "AnonymousDialog"
-                    dialog.Size = UDim2New(0, 260, 0, 80)
+                    dialog.Size = UDim2New(0, 0, 0, 0)
+                    dialog.ClipsDescendants = true
                     dialog.Position = UDim2New(0.5, -130, 0.5, -40)
                     dialog.BackgroundColor3 = Library.Theme.Background
                     dialog.Parent = Items["MainFrame"].Instance
@@ -1866,6 +1897,8 @@ do
                         TweenService:Create(circle, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
                         TweenService:Create(toggleContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetColor}):Play()
                     end)
+
+                    TweenService:Create(dialog, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 260, 0, 80)}):Play()
                 end
 
                 ProfileButton.MouseButton1Click:Connect(function()
@@ -1959,7 +1992,6 @@ do
                     TextSize = 16
                 }):AddToTheme({TextColor3 = 'Text'})
 
-                -- BARRA DE PESQUISA GLOBAL DE FUNÇÕES NA SIDEBAR
                 Items["SearchContainer"] = Instances:Create("Frame", {
                     Parent = Items["Sidebar"].Instance,
                     Position = UDim2New(0, 10, 0, 75),
@@ -1985,7 +2017,6 @@ do
                     ClearTextOnFocus = false
                 }):AddToTheme({TextColor3 = 'Text'})
 
-                -- POPUP CENTRAL DE RESULTADOS DA PESQUISA GLOBAL (SOBREPOSIÇÃO DINÂMICA)
                 local SearchPopup = {} do
                     SearchPopup.Overlay = Instances:Create("TextButton", {
                         Parent = Items["MainFrame"].Instance,
@@ -2038,7 +2069,6 @@ do
                     })
                     Instances:Create("UIListLayout", { Parent = SearchPopup.Scroll.Instance, Padding = UDimNew(0, 5) })
 
-                    -- Correção de colisão de nomes: de SearchPopup.Close para CloseBtn
                     SearchPopup.CloseBtn = Instances:Create("TextButton", {
                         Parent = SearchPopup.Container.Instance,
                         Text = "FECHAR",
@@ -2091,10 +2121,11 @@ do
                     end
                 end
 
-                -- Algoritmo inteligente de correspondência por proximidade e divisão de palavras (Fuzzy)
                 local function MatchQuery(name, query)
                     name = StringLower(name)
                     query = StringLower(query)
+                    
+                    if query == "" then return false end
                     
                     if StringFind(name, query, 1, true) then
                         return true
@@ -2105,22 +2136,22 @@ do
                         TableInsert(words, word)
                     end
                     
-                    if #words > 0 then
-                        for _, word in ipairs(words) do
-                            if StringFind(name, word, 1, true) then
-                                return true
-                            end
+                    if #words == 0 then return false end
+                    
+                    for _, word in ipairs(words) do
+                        if not StringFind(name, word, 1, true) then
+                            return false
                         end
                     end
                     
-                    return false
+                    return true
                 end
 
                 local function UpdateSearch()
                     local success, err = pcall(function()
-                        local query = StringLower(Items["SearchInput"].Instance.Text)
+                        local rawText = Items["SearchInput"].Instance.Text
+                        local query = StringLower(rawText):gsub("^%s*(.-)%s*$", "%1")
                         
-                        -- Limpa os botões de busca anteriores no scroll
                         for _, child in ipairs(SearchPopup.Scroll.Instance:GetChildren()) do
                             if child:IsA("TextButton") or child:IsA("TextLabel") then
                                 child:Destroy()
@@ -2132,7 +2163,6 @@ do
                             return
                         end
 
-                        -- Abre a interface imediatamente ao começar a digitar para dar feedback ao usuário
                         if not SearchPopup.Overlay.Instance.Visible then
                             SearchPopup:Open()
                         end
@@ -2140,11 +2170,14 @@ do
                         local matchesCount = 0
 
                         for _, data in ipairs(Window.SearchableElements) do
+                            if not data.Element or not data.Element:IsDescendantOf(Items["MainFrame"].Instance) then
+                                continue
+                            end
+
                             local matches = MatchQuery(data.Name or "", query)
                             if matches then
                                 matchesCount = matchesCount + 1
 
-                                -- Cria um botão de resultado dentro do menu
                                 local Row = Instances:Create("TextButton", {
                                     Parent = SearchPopup.Scroll.Instance,
                                     Size = UDim2New(1, 0, 0, 35),
@@ -2189,12 +2222,10 @@ do
                                     TweenService:Create(Row.Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Element}):Play()
                                 end)
 
-                                -- Navegação automática ao clicar no resultado
                                 Row:Connect("MouseButton1Click", function()
                                     SearchPopup:Close()
                                     data.Page:Turn(true)
                                     
-                                    -- Pequeno delay para a página carregar e destacar o item
                                     task_delay(0.3, function()
                                         if data.Element and data.Element.Parent then
                                             local stroke = data.Element:FindFirstChildOfClass("UIStroke")
@@ -2211,7 +2242,6 @@ do
                             end
                         end
 
-                        -- Se não houver nenhum resultado correspondente, exibe uma resposta limpa na tela
                         if matchesCount == 0 then
                             local NoResults = Instances:Create("TextLabel", {
                                 Parent = SearchPopup.Scroll.Instance,
@@ -2232,7 +2262,6 @@ do
                     end
                 end
 
-                -- Conexões robustas de escuta nativa para a busca global
                 Items["SearchInput"].Instance:GetPropertyChangedSignal("Text"):Connect(UpdateSearch)
                 Items["SearchInput"].Instance.FocusLost:Connect(UpdateSearch)
                 
@@ -2244,9 +2273,9 @@ do
                     CanvasSize = UDim2New(0, 0, 0, 0),
                     ScrollBarImageColor3 = Library.Theme["Accent"],
                     ScrollBarThickness = 3,
-                    Size = UDim2New(1, -16, 1, -262), -- Ajustado para caber o buscador
+                    Size = UDim2New(1, -16, 1, -262),
                     BackgroundTransparency = 1,
-                    Position = UDim2New(0, 8, 0, 115), -- Deslocado levemente para baixo
+                    Position = UDim2New(0, 8, 0, 115),
                 }):AddToTheme({ScrollBarImageColor3 = 'Accent'})
                 
                 Instances:Create("UIListLayout", {
@@ -2269,7 +2298,19 @@ do
 
             function Window:SetOpen(Bool)
                 Window.IsOpen = Bool 
-                Items["MainFrame"].Instance.Visible = Bool
+                if Bool then
+                    Items["MainFrame"].Instance.Visible = true
+                    Window.ScaleObj.Scale = 0
+                    TweenService:Create(Window.ScaleObj, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+                else
+                    local t = TweenService:Create(Window.ScaleObj, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0})
+                    t:Play()
+                    t.Completed:Connect(function()
+                        if not Window.IsOpen then
+                            Items["MainFrame"].Instance.Visible = false
+                        end
+                    end)
+                end
             end
 
             if Data.MinimizeButton ~= false then
@@ -2285,6 +2326,13 @@ do
                 Instances:Create("UICorner", {Parent = ToggleButton, CornerRadius = UDimNew(0, 18)})
                 local TS = Instances:Create("UIStroke", {Parent = ToggleButton, Color = Library.Theme.Accent, Thickness = 2.5})
                 
+                ToggleButton.MouseEnter:Connect(function()
+                    TweenService:Create(ToggleButton, TweenInfo.new(0.15), {BackgroundColor3 = FromRGB(25, 25, 25), Size = UDim2New(0, 74, 0, 74)}):Play()
+                end)
+                ToggleButton.MouseLeave:Connect(function()
+                    TweenService:Create(ToggleButton, TweenInfo.new(0.15), {BackgroundColor3 = FromRGB(15, 15, 15), Size = UDim2New(0, 70, 0, 70)}):Play()
+                end)
+
                 ToggleButton.MouseButton1Click:Connect(function()
                     Window:SetOpen(not Window.IsOpen)
                 end)
@@ -2370,12 +2418,16 @@ do
 
             function Page:Turn(Bool)
                 Page.Active = Bool 
-                Items["Page"].Instance.Visible = Bool 
                 if Bool then
+                    Items["Page"].Instance.Visible = true
+                    Items["Page"].Instance.Position = UDim2New(0, 0, 0, 30)
+                    TweenService:Create(Items["Page"].Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, 0, 0)}):Play()
+                    
                     TweenService:Create(Items["Background"].Instance, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
                     TweenService:Create(Items["Text"].Instance, TweenInfo.new(0.2), {TextColor3 = FromRGB(0,0,0), TextTransparency = 0}):Play()
                     TweenService:Create(Items["Icon"].Instance, TweenInfo.new(0.2), {ImageColor3 = FromRGB(0,0,0), ImageTransparency = 0}):Play()
                 else
+                    Items["Page"].Instance.Visible = false
                     TweenService:Create(Items["Background"].Instance, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
                     TweenService:Create(Items["Text"].Instance, TweenInfo.new(0.2), {TextColor3 = Library.Theme.Text, TextTransparency = 0.4}):Play()
                     TweenService:Create(Items["Icon"].Instance, TweenInfo.new(0.2), {ImageColor3 = Library.Theme.Text, ImageTransparency = 0.4}):Play()
@@ -2456,7 +2508,6 @@ do
             return setmetatable(Section, Library.Sections)
         end
 
-        -- TOGGLE COM BADGE E LOCK
         Library.Sections.Toggle = function(self, Data)
             Data = Data or {}
 
@@ -2541,6 +2592,13 @@ do
                 Library:SafeCall(Toggle.Callback, Value)
             end
 
+            Items["Toggle"]:Connect("MouseEnter", function()
+                TweenService:Create(Items["Text"].Instance, TweenInfo.new(0.15), {TextTransparency = Toggle.Value and 0 or 0.25}):Play()
+            end)
+            Items["Toggle"]:Connect("MouseLeave", function()
+                TweenService:Create(Items["Text"].Instance, TweenInfo.new(0.15), {TextTransparency = Toggle.Value and 0 or 0.5}):Play()
+            end)
+
             Items["Toggle"]:Connect("MouseButton1Down", function() 
                 if Toggle.Locked then return end
                 Toggle:Set(not Toggle.Value) 
@@ -2568,16 +2626,32 @@ do
                 Instances:Create("UICorner", {Parent = Items["Main"].Instance})
                 Instances:Create("UIStroke", {Parent = Items["Main"].Instance, Color = Library.Theme.Outline})
             end
+
+            Items["Main"]:Connect("MouseEnter", function()
+                TweenService:Create(Items["Main"].Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Element:Lerp(Color3.new(1,1,1), 0.05)}):Play()
+            end)
+            Items["Main"]:Connect("MouseLeave", function()
+                TweenService:Create(Items["Main"].Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Element}):Play()
+            end)
+
             Items["Main"]:Connect("MouseButton1Click", function() Library:SafeCall(Button.Callback) end)
             
             Button.Section.Window:RegisterElement(Items["Main"].Instance, "Button", Button.Name, Button.Section, Button.Section.Page)
             return Button
         end
 
-        -- SLIDER CORRIGIDO COM ARRASTE E KNOB (BOLINHA) ATIVOS E ESTÁVEIS
         Library.Sections.Slider = function(self, Data)
             Data = Data or {}
-            local Slider = {Section = self, Name = Data.Name or "Slider", Min = Data.Min or 0, Max = Data.Max or 100, Value = Data.Default or 0, Flag = Data.Flag or Library:NextFlag(), Callback = Data.Callback or function() end}
+            local Slider = {
+                Section = self, 
+                Name = Data.Name or "Slider", 
+                Min = Data.Min or 0, 
+                Max = Data.Max or 100, 
+                Value = Data.Default or 0, 
+                Decimals = Data.Decimals or 0, 
+                Flag = Data.Flag or Library:NextFlag(), 
+                Callback = Data.Callback or function() end
+            }
             local Items = {} do 
                 Items["Main"] = Instances:Create("Frame", {Parent = Slider.Section.Items["Content"].Instance, Size = UDim2New(1, 0, 0, 35), BackgroundTransparency = 1})
                 Items["Text"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, Text = Slider.Name, FontFace = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 14, BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 15)})
@@ -2587,7 +2661,6 @@ do
                 Instances:Create("UICorner", {Parent = Items["Fill"].Instance})
                 Items["Val"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1})
                 
-                -- Bolinha de Ajuste no Slider (Slider Knob)
                 Items["SliderDot"] = Instances:Create("Frame", {
                     Parent = Items["Fill"].Instance,
                     Size = UDim2New(0, 12, 0, 12),
@@ -2602,8 +2675,11 @@ do
             end
 
             local function Set(val)
+                local step = 10 ^ Slider.Decimals
                 local Clamped = MathClamp(val, Slider.Min, Slider.Max)
+                Clamped = MathFloor(Clamped * step + 0.5) / step
                 Slider.Value = Clamped
+                
                 local Perc = (Clamped - Slider.Min) / (Slider.Max - Slider.Min)
                 Items["Fill"].Instance.Size = UDim2New(Perc, 0, 1, 0)
                 Items["Val"].Instance.Text = tostring(Clamped)
@@ -2617,7 +2693,7 @@ do
                 local BarSize = Items["Bar"].Instance.AbsoluteSize
                 
                 local Perc = MathClamp((MousePos.X - BarPos.X) / BarSize.X, 0, 1)
-                local val = MathFloor(Slider.Min + (Slider.Max - Slider.Min) * Perc)
+                local val = Slider.Min + (Slider.Max - Slider.Min) * Perc
                 Set(val)
             end
 
@@ -2625,6 +2701,7 @@ do
             Items["Bar"]:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
+                    TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 14, 0, 14)}):Play()
                     Update()
                 end
             end)
@@ -2638,6 +2715,16 @@ do
             Library:Connect(UserInputService.InputEnded, function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = false
+                    TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 12, 0, 12)}):Play()
+                end
+            end)
+
+            Items["Bar"]:Connect("MouseEnter", function()
+                TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 14, 0, 14)}):Play()
+            end)
+            Items["Bar"]:Connect("MouseLeave", function()
+                if not Dragging then
+                    TweenService:Create(Items["SliderDot"].Instance, TweenInfo.new(0.15), {Size = UDim2New(0, 12, 0, 12)}):Play()
                 end
             end)
 
@@ -2646,7 +2733,6 @@ do
             return Slider 
         end
 
-        -- DROPDOWN COM PESQUISA INTERNA ATIVADA NATIVAMENTE (CORRIGIDO)
         Library.Sections.Dropdown = function(self, Data)
             Data = Data or {}
             local Dropdown = {Section = self, Name = Data.Name or "Dropdown", Items = Data.Items or {}, Flag = Data.Flag or Library:NextFlag(), Callback = Data.Callback or function() end, Open = false, Locked = Data.Lock or false}
@@ -2664,7 +2750,6 @@ do
                 })
                 Instances:Create("UICorner", {Parent = Items["Main"].Instance})
                 
-                -- Adiciona suporte para Badge no Dropdown
                 Library:CreateBadge(Items["Main"].Instance, Data)
 
                 Items["Container"] = Instances:Create("Frame", {
@@ -2680,7 +2765,6 @@ do
                 Instances:Create("UIPadding", {Parent = Items["Container"].Instance, PaddingTop = UDimNew(0, 6), PaddingBottom = UDimNew(0, 6), PaddingLeft = UDimNew(0, 6), PaddingRight = UDimNew(0, 6)})
                 Instances:Create("UICorner", {Parent = Items["Container"].Instance})
 
-                -- SISTEMA DE BUSCA DENTRO DO DROPDOWN
                 local DropdownSearchContainer = Instances:Create("Frame", {
                     Parent = Items["Container"].Instance,
                     Size = UDim2New(1, 0, 0, 26),
@@ -2722,7 +2806,6 @@ do
                     end
                 end
 
-                -- Correção e Redundância: Registro direto e robusto no TextBox nativo do Dropdown
                 DropdownSearchInput.Instance:GetPropertyChangedSignal("Text"):Connect(FilterDropdownItems)
                 DropdownSearchInput.Instance.FocusLost:Connect(FilterDropdownItems)
 
@@ -2739,23 +2822,32 @@ do
 
                 function Dropdown:Refresh(newList)
                     Dropdown.Items = newList
-                    -- Deleta apenas os botões de itens antigos, preservando a barra de busca
-                    for _,v in pairs(Items["Container"].Instance:GetChildren()) do 
+                    for _, v in pairs(Items["Container"].Instance:GetChildren()) do 
                         if v:IsA("TextButton") then v:Destroy() end 
                     end
-                    TableClear(itemButtons) -- Fallback seguro de limpeza
+                    TableClear(itemButtons)
 
-                    for _,v in ipairs(newList) do 
+                    for _, v in ipairs(newList) do 
                         local b = Instances:Create("TextButton", {
                             Parent = Items["Container"].Instance, 
                             Size = UDim2New(1, 0, 0, 25), 
                             BackgroundTransparency = 1, 
+                            BackgroundColor3 = Library.Theme.Outline,
                             Text = v, 
                             TextColor3 = Library.Theme.Text, 
+                            TextTransparency = 0.4,
                             FontFace = Library.Font, 
                             TextSize = 14
                         })
+                        b:AddToTheme({TextColor3 = "Text", BackgroundColor3 = "Outline"})
                         TableInsert(itemButtons, {Button = b, Name = v})
+
+                        b:Connect("MouseEnter", function()
+                            TweenService:Create(b.Instance, TweenInfo.new(0.15), {TextTransparency = 0, BackgroundTransparency = 0.9}):Play()
+                        end)
+                        b:Connect("MouseLeave", function()
+                            TweenService:Create(b.Instance, TweenInfo.new(0.15), {TextTransparency = 0.4, BackgroundTransparency = 1}):Play()
+                        end)
 
                         b:Connect("MouseButton1Click", function()
                             Items["Main"].Instance.Text = Dropdown.Name .. ": " .. v 
@@ -2774,6 +2866,13 @@ do
                 Items["Lock"].Instance.Visible = Bool 
                 TweenService:Create(Items["Lock"].Instance, TweenInfo.new(0.2), {BackgroundTransparency = Bool and 0.6 or 1}):Play()
             end
+
+            Items["Main"]:Connect("MouseEnter", function()
+                TweenService:Create(Items["Main"].Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Element:Lerp(Color3.new(1,1,1), 0.05)}):Play()
+            end)
+            Items["Main"]:Connect("MouseLeave", function()
+                TweenService:Create(Items["Main"].Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Element}):Play()
+            end)
 
             Items["Main"]:Connect("MouseButton1Click", function()
                 if Dropdown.Locked then return end
@@ -2798,9 +2897,8 @@ do
         end
     end
 
-    -- ALIASES PARA FACILITAR
     function Library:CreateWindow(Data) return self:Window(Data) end
-    function Library:AddPage(Data) return self:Page(Data) end -- Atalho AddPage adicionado
+    function Library:AddPage(Data) return self:Page(Data) end
     function Library.Pages:AddSection(Data) return self:Section(Data) end
     function Library.Sections:AddToggle(Data) return self:Toggle(Data) end
     function Library.Sections:AddButton(Data) return self:Button(Data) end
