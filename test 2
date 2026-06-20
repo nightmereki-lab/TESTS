@@ -134,10 +134,10 @@ do
         ["QuotedDouble"] = '"', ["Hash"] = "#", ["Dollar"] = "$", ["Percent"] = "%",
         ["Ampersand"] = "&", ["Quote"] = "'", ["LeftParenthesis"] = "(", ["RightParenthesis"] = " )",
         ["Asterisk"] = "*", ["Plus"] = "+", ["Comma"] = ",", ["Minus"] = "-",
-        ["Period"] = ".", ["Slash"] = "`", ["Three"] = "3", ["Seven"] = "7",
+        ["Period"] = ".", ["Slash"] = "/", ["Three"] = "3", ["Seven"] = "7",
         ["Eight"] = "8", ["Colon"] = ":", ["Semicolon"] = ";", ["LessThan"] = "<",
         ["GreaterThan"] = ">", ["Question"] = "?", ["Equals"] = "=", ["At"] = "@",
-        ["LeftBracket"] = "LeftBracket", ["RightBracket"] = "RightBracked", ["BackSlash"] = "BackSlash", ["Caret"] = "^",
+        ["LeftBracket"] = "LeftBracket", ["RightBracket"] = "RightBracket", ["BackSlash"] = "BackSlash", ["Caret"] = "^",
         ["Underscore"] = "_", ["Backquote"] = "`", ["LeftCurly"] = "{", ["Pipe"] = "|",
         ["RightCurly"] = "}", ["Tilde"] = "~", ["Delete"] = "Delete", ["End"] = "End",
         ["KeypadZero"] = "Keypad0", ["KeypadOne"] = "Keypad1", ["KeypadTwo"] = "Keypad2", ["KeypadThree"] = "Keypad3",
@@ -162,9 +162,11 @@ do
 
     Library.Theme = TableClone(Themes["Preset"])
 
-    for _, Value in pairs(Library.Folders) do 
-        if not isfolder(Value) then
-            makefolder(Value)
+    if writefile and readfile and isfile and makefolder then
+        for _, Value in pairs(Library.Folders) do 
+            if not isfile(Value) and not isfolder(Value) then
+                makefolder(Value)
+            end
         end
     end
 
@@ -252,7 +254,8 @@ do
                     local NewX = StartPos.X.Offset + DragDelta.X
                     local NewY = StartPos.Y.Offset + DragDelta.Y
 
-                    local ParentSize = (Gui.Parent and (Gui.Parent:IsA("GuiObject") or Gui.Parent:IsA("LayerCollector"))) and Gui.Parent.AbsoluteSize or Camera.ViewportSize
+                    -- CORREÇÃO: ScreenGui não possui AbsoluteSize. Validação de GuiObject adicionada.
+                    local ParentSize = (Gui.Parent and Gui.Parent:IsA("GuiObject")) and Gui.Parent.AbsoluteSize or Camera.ViewportSize
                     local GuiSize = Gui.AbsoluteSize
                     
                     local MinX = GuiSize.X * Gui.AnchorPoint.X
@@ -392,24 +395,33 @@ do
 
     local CustomFont = {} do
         function CustomFont:New(Name, Weight, Style, Data)
-            if not isfile(Data.Id) then 
-                writefile(Data.Id, game:HttpGet(Data.Url))
-            end
+            -- CORREÇÃO: Fallback adicionado para prevenir crashes em ambientes sem FS / CustomAsset
+            local success, fontObj = pcall(function()
+                if writefile and readfile and isfile and getcustomasset then
+                    if not isfile(Data.Id) then 
+                        writefile(Data.Id, game:HttpGet(Data.Url))
+                    end
 
-            local FontData = {
-                name = Name,
-                faces = {
-                    {
+                    local FontData = {
                         name = Name,
-                        weight = Weight,
-                        style = Style,
-                        assetId = getcustomasset(Data.Id)
+                        faces = {
+                            {
+                                name = Name,
+                                weight = Weight,
+                                style = Style,
+                                assetId = getcustomasset(Data.Id)
+                            }
+                        }
                     }
-                }
-            }
 
-            writefile(StringFormat("%s/%s.font", Library.Folders.Assets, Name), HttpService:JSONEncode(FontData))
-            return Font.new(getcustomasset(StringFormat("%s/%s.font", Library.Folders.Assets, Name)))
+                    writefile(StringFormat("%s/%s.font", Library.Folders.Assets, Name), HttpService:JSONEncode(FontData))
+                    return Font.new(getcustomasset(StringFormat("%s/%s.font", Library.Folders.Assets, Name)))
+                end
+            end)
+            if success and fontObj then
+                return fontObj
+            end
+            return Font.fromEnum(Enum.Font.SourceSans)
         end
 
         Library.Font = CustomFont:New("OutfitMedium", 400, "Regular", {
@@ -738,6 +750,11 @@ do
         if self.Holder then 
             self.Holder:Clean()
         end
+
+        local lighting = game:GetService("Lighting")
+        local blur = lighting:FindFirstChild("Midnight_BadgeBlur")
+        if blur then blur:Destroy() end
+
         Library = nil 
         getgenv().Library = nil
     end
@@ -769,7 +786,9 @@ do
     end
 
     Library.Connect = function(self, Event, Callback, Name)
-        Name = Name or StringFormat("connection_number_%s_%s", self.UnnamedConnections + 1, HttpService:GenerateGUID(false))
+        -- CORREÇÃO: Incremento do número de conexões ativado
+        self.UnnamedConnections = self.UnnamedConnections + 1
+        Name = Name or StringFormat("connection_number_%s_%s", self.UnnamedConnections, HttpService:GenerateGUID(false))
 
         local NewConnection = {
             Event = Event,
@@ -860,12 +879,15 @@ do
     end
 
     Library.DeleteConfig = function(self, Config)
+        if not delfile then return end
         local Path = Library.Folders.Configs .. "/" .. Config
-        if isfile(Path) then delfile(Path) end
+        if isfile and isfile(Path) then delfile(Path) end
     end
 
     Library.RefreshConfigsList = function(self, Element)
-        local List = listfiles(Library.Folders.Configs)
+        if not listfiles then return end
+        local success, List = pcall(listfiles, Library.Folders.Configs)
+        if not success or not List then return end
         local ReturnList = {}
 
         for Index = 1, #List do 
@@ -893,17 +915,27 @@ do
         end
     end
 
+    -- CORREÇÃO: Elimina vazamentos de memória limpando elementos de tema que foram destruídos
     Library.ChangeTheme = function(self, Theme, Color)
         self.Theme[Theme] = Color
+        local activeItems = {}
         for _, Item in ipairs(self.ThemeItems) do
-            for Property, Value in pairs(Item.Properties) do
-                if type(Value) == "string" and Value == Theme then
-                    Item.Item[Property] = Color
-                elseif type(Value) == "function" then
-                    Item.Item[Property] = Value()
+            local instance = Item.Item
+            local success, parent = pcall(function() return instance.Parent end)
+            if success and instance then
+                for Property, Value in pairs(Item.Properties) do
+                    if type(Value) == "string" and Value == Theme then
+                        instance[Property] = Color
+                    elseif type(Value) == "function" then
+                        instance[Property] = Value()
+                    end
                 end
+                TableInsert(activeItems, Item)
+            else
+                self.ThemeMap[instance] = nil
             end
         end
+        self.ThemeItems = activeItems
     end
 
     Library.IsMouseOverFrame = function(self, Frame)
@@ -2083,17 +2115,18 @@ do
                 Username.TextSize = 16
                 Username.TextColor3 = Library.Theme.Text
 
+                -- CORREÇÃO: Pcall e verificação adicionadas para evitar crashes em executores sem FS
                 local anonConfigPath = "midnight_lib/anonymous_config.json"
                 local isAnonymous = false
 
-                if isfile(anonConfigPath) then
+                if isfile and readfile and isfile(anonConfigPath) then
                     local success, decoded = pcall(function()
-                        return HttpService:JSONEncode(readfile(anonConfigPath))
+                        return HttpService:JSONDecode(readfile(anonConfigPath))
                     end)
                     if success and decoded and decoded.Anonymous ~= nil then
                         isAnonymous = decoded.Anonymous
                     end
-                else
+                elseif writefile then
                     pcall(function()
                         writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = false}))
                     end)
@@ -2104,11 +2137,14 @@ do
                         Avatar.Image = "rbxassetid://10444634125"
                         Username.Text = "Anonymous"
                     else
-                        Avatar.Image = Players:GetUserThumbnailAsync(
-                            LocalPlayer.UserId,
-                            Enum.ThumbnailType.HeadShot,
-                            Enum.ThumbnailSize.Size420x420
-                        )
+                        local thumbSuccess, thumbResult = pcall(function()
+                            return Players:GetUserThumbnailAsync(
+                                LocalPlayer.UserId,
+                                Enum.ThumbnailType.HeadShot,
+                                Enum.ThumbnailSize.Size420x420
+                            )
+                        end)
+                        Avatar.Image = thumbSuccess and thumbResult or "rbxassetid://10444634125"
                         Username.Text = LocalPlayer.Name
                     end
                 end
@@ -2194,9 +2230,11 @@ do
 
                     toggleContainer.MouseButton1Click:Connect(function()
                         isAnonymous = not isAnonymous
-                        pcall(function()
-                            writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = isAnonymous}))
-                        end)
+                        if writefile then
+                            pcall(function()
+                                writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = isAnonymous}))
+                            end)
+                        end
                         updateProfileDisplay()
 
                         local targetPos = isAnonymous and UDim2New(1, -20, 0.5, -8) or UDim2New(0, 4, 0.5, -8)
@@ -2668,6 +2706,10 @@ do
                 })
                 
                 local function RefreshConfigs()
+                    if not listfiles then
+                        ConfigDropdown:Refresh({"FS não suportado"})
+                        return
+                    end
                     local success, files = pcall(listfiles, Library.Folders.Configs)
                     if not success then
                         ConfigDropdown:Refresh({"Erro ao ler pasta"})
@@ -2688,6 +2730,7 @@ do
                 ConfigSec:AddButton({
                     Name = "Create / Save Config",
                     Callback = function()
+                        if not writefile then return end
                         local name = TextBox.Instance.Text:gsub("^%s*(.-)%s*$", "%1")
                         if name == "" then
                             Library:Notify({Title = "Aviso", Content = "Insira um nome válido para a config.", Duration = 4, Type = "RISK"})
@@ -2707,6 +2750,7 @@ do
                 ConfigSec:AddButton({
                     Name = "Load Selected Config",
                     Callback = function()
+                        if not readfile or not isfile then return end
                         if SelectedConfig == "None" or SelectedConfig == "" then
                             Library:Notify({Title = "Aviso", Content = "Selecione uma configuração primeiro.", Duration = 4, Type = "RISK"})
                             return
@@ -2727,6 +2771,7 @@ do
                 ConfigSec:AddButton({
                     Name = "Delete Selected Config",
                     Callback = function()
+                        if not delfile or not isfile then return end
                         if SelectedConfig == "None" or SelectedConfig == "" then
                             Library:Notify({Title = "Aviso", Content = "Selecione uma configuração para deletar.", Duration = 4, Type = "RISK"})
                             return
@@ -2793,7 +2838,6 @@ do
 
             setmetatable(Window, Library)
             
-            -- Adiciona a página de configurações no fim do frame atual (após o script do usuário carregar as abas dele)
             task.defer(function()
                 if Window and Window.AddConfigPage then
                     Window:AddConfigPage()
