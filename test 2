@@ -85,7 +85,7 @@ do
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         Flags = {},
-        IsInteracting = false, -- Gerencia estados de arraste para evitar conflito com a janela
+        IsInteracting = false,
         Tween = {
             Time = 0.2,
             Style = Enum.EasingStyle.Circular,
@@ -129,77 +129,24 @@ do
     Library.Pages.__index = Library.Pages
 
     local Keys = {
-        ["Unknown"]           = "Unknown",
-        ["Backspace"]         = "Back",
-        ["Tab"]               = "Tab",
-        ["Clear"]             = "Clear",
-        ["Return"]            = "Return",
-        ["Pause"]             = "Pause",
-        ["Escape"]            = "Escape",
-        ["Space"]             = "Space",
-        ["QuotedDouble"]      = '"',
-        ["Hash"]              = "#",
-        ["Dollar"]            = "$",
-        ["Percent"]           = "%",
-        ["Ampersand"]         = "&",
-        ["Quote"]             = "'",
-        ["LeftParenthesis"]   = "(",
-        ["RightParenthesis"]  = " )",
-        ["Asterisk"]          = "*",
-        ["Plus"]              = "+",
-        ["Comma"]             = ",",
-        ["Minus"]             = "-",
-        ["Period"]            = ".",
-        ["Slash"]             = "`",
-        ["Three"]             = "3",
-        ["Seven"]             = "7",
-        ["Eight"]             = "8",
-        ["Colon"]             = ":",
-        ["Semicolon"]         = ";",
-        ["LessThan"]          = "<",
-        ["GreaterThan"]       = ">",
-        ["Question"]          = "?",
-        ["Equals"]            = "=",
-        ["At"]                = "@",
-        ["LeftBracket"]       = "LeftBracket",
-        ["RightBracket"]      = "RightBracked",
-        ["BackSlash"]         = "BackSlash",
-        ["Caret"]             = "^",
-        ["Underscore"]        = "_",
-        ["Backquote"]         = "`",
-        ["LeftCurly"]         = "{",
-        ["Pipe"]              = "|",
-        ["RightCurly"]        = "}",
-        ["Tilde"]             = "~",
-        ["Delete"]            = "Delete",
-        ["End"]               = "End",
-        ["KeypadZero"]        = "Keypad0",
-        ["KeypadOne"]         = "Keypad1",
-        ["KeypadTwo"]         = "Keypad2",
-        ["KeypadThree"]       = "Keypad3",
-        ["KeypadFour"]        = "Keypad4",
-        ["KeypadFive"]        = "Keypad5",
-        ["KeypadSix"]         = "Keypad6",
-        ["KeypadSeven"]       = "Keypad7",
-        ["KeypadEight"]       = "Keypad8",
-        ["KeypadNine"]        = "Keypad9",
-        ["KeypadPeriod"]      = "KeypadP",
-        ["KeypadDivide"]      = "KeypadD",
-        ["KeypadMultiply"]    = "KeypadM",
-        ["KeypadMinus"]       = "KeypadM",
-        ["KeypadPlus"]        = "KeypadP",
-        ["KeypadEnter"]       = "KeypadE",
-        ["KeypadEquals"]      = "KeypadE",
-        ["Insert"]            = "Insert",
-        ["Home"]              = "Home",
-        ["PageUp"]            = "PageUp",
-        ["PageDown"]          = "PageDown",
-        ["RightShift"]        = "RightShift",
-        ["LeftShift"]         = "LeftShift",
-        ["RightControl"]      = "RightControl",
-        ["LeftControl"]       = "LeftControl",
-        ["LeftAlt"]           = "LeftAlt",
-        ["RightAlt"]          = "RightAlt"
+        ["Unknown"] = "Unknown", ["Backspace"] = "Back", ["Tab"] = "Tab", ["Clear"] = "Clear",
+        ["Return"] = "Return", ["Pause"] = "Pause", ["Escape"] = "Escape", ["Space"] = "Space",
+        ["QuotedDouble"] = '"', ["Hash"] = "#", ["Dollar"] = "$", ["Percent"] = "%",
+        ["Ampersand"] = "&", ["Quote"] = "'", ["LeftParenthesis"] = "(", ["RightParenthesis"] = " )",
+        ["Asterisk"] = "*", ["Plus"] = "+", ["Comma"] = ",", ["Minus"] = "-",
+        ["Period"] = ".", ["Slash"] = "`", ["Three"] = "3", ["Seven"] = "7",
+        ["Eight"] = "8", ["Colon"] = ":", ["Semicolon"] = ";", ["LessThan"] = "<",
+        ["GreaterThan"] = ">", ["Question"] = "?", ["Equals"] = "=", ["At"] = "@",
+        ["LeftBracket"] = "LeftBracket", ["RightBracket"] = "RightBracked", ["BackSlash"] = "BackSlash", ["Caret"] = "^",
+        ["Underscore"] = "_", ["Backquote"] = "`", ["LeftCurly"] = "{", ["Pipe"] = "|",
+        ["RightCurly"] = "}", ["Tilde"] = "~", ["Delete"] = "Delete", ["End"] = "End",
+        ["KeypadZero"] = "Keypad0", ["KeypadOne"] = "Keypad1", ["KeypadTwo"] = "Keypad2", ["KeypadThree"] = "Keypad3",
+        ["KeypadFour"] = "Keypad4", ["KeypadFive"] = "Keypad5", ["KeypadSix"] = "Keypad6", ["KeypadSeven"] = "Keypad7",
+        ["KeypadEight"] = "Keypad8", ["KeypadNine"] = "Keypad9", ["KeypadPeriod"] = "KeypadP", ["KeypadDivide"] = "KeypadD",
+        ["KeypadMultiply"] = "KeypadM", ["KeypadMinus"] = "KeypadM", ["KeypadPlus"] = "KeypadP", ["KeypadEnter"] = "KeypadE",
+        ["KeypadEquals"] = "KeypadE", ["Insert"] = "Insert", ["Home"] = "Home", ["PageUp"] = "PageUp",
+        ["PageDown"] = "PageDown", ["RightShift"] = "RightShift", ["LeftShift"] = "LeftShift", ["RightControl"] = "RightControl",
+        ["LeftControl"] = "LeftControl", ["LeftAlt"] = "LeftAlt", ["RightAlt"] = "RightAlt"
     }
 
     local Themes = {
@@ -223,122 +170,54 @@ do
 
     local Tween = {} do
         Tween.__index = Tween
-
         Tween.Create = function(self, Item, Info, Goal, IsRawItem)
             Item = IsRawItem and Item or Item.Instance
             Info = Info or TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction)
-
-            local NewTween = {
-                Tween = TweenService:Create(Item, Info, Goal),
-                Info = Info,
-                Goal = Goal,
-                Item = Item
-            }
+            local NewTween = { Tween = TweenService:Create(Item, Info, Goal), Info = Info, Goal = Goal, Item = Item }
             NewTween.Tween:Play()
             setmetatable(NewTween, Tween)
             return NewTween
         end
-
         Tween.GetProperty = function(self, Item)
-            if Item:IsA("Frame") then
-                return { "BackgroundTransparency" }
-            elseif Item:IsA("TextLabel") or Item:IsA("TextButton") then
-                return { "TextTransparency", "BackgroundTransparency" }
-            elseif Item:IsA("ImageLabel") or Item:IsA("ImageButton") then
-                return { "BackgroundTransparency", "ImageTransparency" }
-            elseif Item:IsA("ScrollingFrame") then
-                return { "BackgroundTransparency", "ScrollBarImageTransparency" }
-            elseif Item:IsA("TextBox") then
-                return { "TextTransparency", "BackgroundTransparency" }
-            elseif Item:IsA("UIStroke") then 
-                return { "Transparency" }
-            end
+            if Item:IsA("Frame") then return { "BackgroundTransparency" }
+            elseif Item:IsA("TextLabel") or Item:IsA("TextButton") then return { "TextTransparency", "BackgroundTransparency" }
+            elseif Item:IsA("ImageLabel") or Item:IsA("ImageButton") then return { "BackgroundTransparency", "ImageTransparency" }
+            elseif Item:IsA("ScrollingFrame") then return { "BackgroundTransparency", "ScrollBarImageTransparency" }
+            elseif Item:IsA("TextBox") then return { "TextTransparency", "BackgroundTransparency" }
+            elseif Item:IsA("UIStroke") then return { "Transparency" } end
         end
-
         Tween.FadeItem = function(self, Item, Property, Visibility, Speed)
             Item = Item or self.Item 
             local OldTransparency = Item[Property]
             Item[Property] = Visibility and 1 or OldTransparency
-
-            local NewTween = Tween.Create(nil, Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {
-                [Property] = Visibility and OldTransparency or 1
-            }, true)
-
+            local NewTween = Tween.Create(nil, Item, TweenInfo.new(Speed or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), { [Property] = Visibility and OldTransparency or 1 }, true)
             Library:Connect(NewTween.Tween.Completed, function()
-                if not Visibility then 
-                    task_wait()
-                    Item[Property] = OldTransparency
-                end
+                if not Visibility then task_wait() Item[Property] = OldTransparency end
             end)
-
             return NewTween
         end
-
-        Tween.Get = function(self)
-            if not self.Tween then return end
-            return self.Tween, self.Info, self.Goal
-        end
-
-        Tween.Pause = function(self)
-            if self.Tween then self.Tween:Pause() end
-        end
-
-        Tween.Play = function(self)
-            if self.Tween then self.Tween:Play() end
-        end
-
-        Tween.Clean = function(self)
-            if not self.Tween then return end
-            self:Pause()
-            self = nil
-        end
+        Tween.Get = function(self) if self.Tween then return self.Tween, self.Info, self.Goal end end
+        Tween.Pause = function(self) if self.Tween then self.Tween:Pause() end end
+        Tween.Play = function(self) if self.Tween then self.Tween:Play() end end
+        Tween.Clean = function(self) if self.Tween then self:Pause() self = nil end end
     end
 
     local Instances = {} do
         Instances.__index = Instances
 
         Instances.Create = function(self, Class, Properties)
-            local NewItem = {
-                Instance = InstanceNew(Class),
-                Properties = Properties,
-                Class = Class
-            }
+            local NewItem = { Instance = InstanceNew(Class), Properties = Properties, Class = Class }
             setmetatable(NewItem, Instances)
-            for Property, Value in pairs(NewItem.Properties) do
-                NewItem.Instance[Property] = Value
-            end
+            for Property, Value in pairs(NewItem.Properties) do NewItem.Instance[Property] = Value end
             return NewItem
         end
 
-        Instances.AddToTheme = function(self, Properties)
-            if self.Instance then Library:AddToTheme(self, Properties) end
-            return self
-        end
-
-        Instances.ChangeItemTheme = function(self, Properties)
-            if self.Instance then Library:ChangeItemTheme(self, Properties) end
-        end
-
-        Instances.Connect = function(self, Event, Callback, Name)
-            if self.Instance and self.Instance[Event] then 
-                return Library:Connect(self.Instance[Event], Callback, Name)
-            end
-        end
-
-        Instances.Tween = function(self, Info, Goal)
-            if self.Instance then return Tween.Create(nil, self, Info, Goal) end
-        end
-
-        Instances.Disconnect = function(self, Name)
-            if self.Instance then return Library:Disconnect(Name) end
-        end
-
-        Instances.Clean = function(self)
-            if self.Instance then 
-                self.Instance:Destroy()
-                self = nil
-            end
-        end
+        Instances.AddToTheme = function(self, Properties) if self.Instance then Library:AddToTheme(self, Properties) end return self end
+        Instances.ChangeItemTheme = function(self, Properties) if self.Instance then Library:ChangeItemTheme(self, Properties) end end
+        Instances.Connect = function(self, Event, Callback, Name) if self.Instance and self.Instance[Event] then return Library:Connect(self.Instance[Event], Callback, Name) end end
+        Instances.Tween = function(self, Info, Goal) if self.Instance then return Tween.Create(nil, self, Info, Goal) end end
+        Instances.Disconnect = function(self, Name) if self.Instance then return Library:Disconnect(Name) end end
+        Instances.Clean = function(self) if self.Instance then self.Instance:Destroy() self = nil end end
 
         Instances.MakeDraggable = function(self)
             if not self.Instance then return end
@@ -2209,7 +2088,7 @@ do
 
                 if isfile(anonConfigPath) then
                     local success, decoded = pcall(function()
-                        return HttpService:JSONDecode(readfile(anonConfigPath))
+                        return HttpService:JSONEncode(readfile(anonConfigPath))
                     end)
                     if success and decoded and decoded.Anonymous ~= nil then
                         isAnonymous = decoded.Anonymous
@@ -2913,7 +2792,13 @@ do
             end
 
             setmetatable(Window, Library)
-            Window:AddConfigPage()
+            
+            -- Adiciona a página de configurações no fim do frame atual (após o script do usuário carregar as abas dele)
+            task.defer(function()
+                if Window and Window.AddConfigPage then
+                    Window:AddConfigPage()
+                end
+            end)
 
             Window:SetOpen(true)
             return Window
@@ -3317,7 +3202,7 @@ do
             return Slider 
         end
 
-        -- CAIXA DE SELEÇÃO CORRIGIDA (DROPDOWN)
+        -- DROPDOWN
         Library.Sections.Dropdown = function(self, Data)
             Data = Data or {}
             local Dropdown = {
@@ -3333,7 +3218,7 @@ do
             }
             
             local Items = {}
-            local itemButtons = {} -- Declarado aqui no topo para evitar qualquer bug de escopo
+            local itemButtons = {}
 
             Items["Main"] = Instances:Create("TextButton", {
                 Parent = Dropdown.Section.Items["Content"].Instance,
