@@ -545,7 +545,6 @@ do
         Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 10
         local baseZIndex = Library.CurrentPopupZIndex
 
-        -- SISTEMA DE BLUR DINÂMICO ADICIONADO AO LIGHTING
         local Blur = Instance.new("BlurEffect")
         Blur.Name = "Midnight_BadgeBlur"
         Blur.Size = 0
@@ -1051,7 +1050,7 @@ do
         return Library:CompareVectors(Top, BoundryTop) or Library:CompareVectors(BoundryBottom, Bottom)
     end
 
-    -- SELETOR DE CORES
+    -- COLORPICKER
     Library.CreateColorpicker = function(self, Data)
         local Colorpicker = {
             Flag = Data.Flag, 
@@ -1686,7 +1685,7 @@ do
 
     local Keys = Keys
 
-    -- SISTEMA DE KEYBINDS
+    -- KEYBINDS
     Library.CreateKeybind = function(self, Data)
         local Keybind = {
             Flag = Data.Flag,
@@ -2112,7 +2111,7 @@ do
             return Watermark 
         end
 
-        -- JANELA PRINCIPAL (WINDOW)
+        -- WINDOW
         Library.Window = function(self, Data)
             Data = Data or {}
 
@@ -2549,7 +2548,6 @@ do
                     end
                 end
 
-                -- ALGORITMO DE PESQUISA
                 local function MatchQuery(name, query)
                     name = StringLower(name)
                     query = StringLower(query)
@@ -2831,7 +2829,7 @@ do
                     Name = "Load Selected Config",
                     Callback = function()
                         if SelectedConfig == "None" or SelectedConfig == "" then
-                            Library:Notify({Title = "Aviso", Content = "Secione uma configuração primeiro.", Duration = 4, Type = "RISK"})
+                            Library:Notify({Title = "Aviso", Content = "Selecione uma configuração primeiro.", Duration = 4, Type = "RISK"})
                             return
                         end
                         local path = Library.Folders.Configs .. "/" .. SelectedConfig .. ".json"
@@ -2921,7 +2919,6 @@ do
             return Window
         end
 
-        -- ESTRUTURA DE PÁGINAS (PAGES)
         local Active = false
         Library.Page = function(self, Data)
             Data = Data or {}
@@ -3025,7 +3022,6 @@ do
             return setmetatable(Page, Library.Pages)
         end
 
-        -- SEÇÃO (SECTION)
         Library.Pages.Section = function(self, Data)
             Data = Data or {}
 
@@ -3089,7 +3085,6 @@ do
             return setmetatable(Section, Library.Sections)
         end
 
-        -- ALTERNADOR (TOGGLE)
         Library.Sections.Toggle = function(self, Data)
             Data = Data or {}
 
@@ -3193,7 +3188,6 @@ do
             return Toggle 
         end
 
-        -- BOTÃO (BUTTON)
         local Active = false
         Library.Sections.Button = function(self, Data)
             Data = Data or {}
@@ -3226,7 +3220,6 @@ do
             return Button
         end
 
-        -- CONTROLE DESLIZANTE (SLIDER)
         Library.Sections.Slider = function(self, Data)
             Data = Data or {}
             local Slider = {
@@ -3324,7 +3317,7 @@ do
             return Slider 
         end
 
-        -- CAIXA DE SELEÇÃO ATUALIZADA (DROPDOWN)
+        -- CAIXA DE SELEÇÃO CORRIGIDA (DROPDOWN)
         Library.Sections.Dropdown = function(self, Data)
             Data = Data or {}
             local Dropdown = {
@@ -3339,285 +3332,273 @@ do
                 Value = Data.Multi and {} or nil
             }
             
-            local Items = {} do 
-                Items["Main"] = Instances:Create("TextButton", {
-                    Parent = Dropdown.Section.Items["Content"].Instance,
-                    Size = UDim2New(1, 0, 0, 30),
-                    BackgroundColor3 = Library.Theme.Element,
-                    Text = Dropdown.Name .. ": ...",
-                    TextColor3 = Library.Theme.Text,
-                    FontFace = Library.Font,
-                    TextSize = 15,
-                    Active = true,
-                    AutoButtonColor = false,
-                    TextXAlignment = Enum.TextXAlignment.Left
-                })
-                Instances:Create("UICorner", {Parent = Items["Main"].Instance, CornerRadius = UDimNew(0, 6)})
-                Instances:Create("UIStroke", {Parent = Items["Main"].Instance, Color = Library.Theme.Outline, Thickness = 1}):AddToTheme({Color = 'Outline'})
-                
-                -- Adiciona espaçamento interno para alinhar o texto e criar espaço para a seta
-                Instances:Create("UIPadding", {
-                    Parent = Items["Main"].Instance,
-                    PaddingLeft = UDimNew(0, 10),
-                    PaddingRight = UDimNew(0, 35)
-                })
+            local Items = {}
+            local itemButtons = {} -- Declarado aqui no topo para evitar qualquer bug de escopo
 
-                -- Seta indicadora (Arrow)
-                Items["Arrow"] = Instances:Create("ImageLabel", {
-                    Parent = Items["Main"].Instance,
-                    Size = UDim2New(0, 12, 0, 12),
-                    Position = UDim2New(1, 20, 0.5, 0), -- Ajustado para compensar o PaddingRight
-                    AnchorPoint = Vector2New(1, 0.5),
-                    Image = "rbxassetid://14324208449", -- Seta limpa apontando para baixo
-                    BackgroundTransparency = 1,
-                    ImageColor3 = Library.Theme.Text
-                }):AddToTheme({ImageColor3 = 'Text'})
+            Items["Main"] = Instances:Create("TextButton", {
+                Parent = Dropdown.Section.Items["Content"].Instance,
+                Size = UDim2New(1, 0, 0, 30),
+                BackgroundColor3 = Library.Theme.Element,
+                Text = Dropdown.Name .. ": ...",
+                TextColor3 = Library.Theme.Text,
+                FontFace = Library.Font,
+                TextSize = 15,
+                Active = true,
+                AutoButtonColor = false,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+            Instances:Create("UICorner", {Parent = Items["Main"].Instance, CornerRadius = UDimNew(0, 6)})
+            Instances:Create("UIStroke", {Parent = Items["Main"].Instance, Color = Library.Theme.Outline, Thickness = 1}):AddToTheme({Color = 'Outline'})
+            
+            Instances:Create("UIPadding", {
+                Parent = Items["Main"].Instance,
+                PaddingLeft = UDimNew(0, 10),
+                PaddingRight = UDimNew(0, 35)
+            })
 
-                Library:CreateBadge(Items["Main"].Instance, Data)
+            Items["Arrow"] = Instances:Create("ImageLabel", {
+                Parent = Items["Main"].Instance,
+                Size = UDim2New(0, 12, 0, 12),
+                Position = UDim2New(1, 20, 0.5, 0),
+                AnchorPoint = Vector2New(1, 0.5),
+                Image = "rbxassetid://14324208449",
+                BackgroundTransparency = 1,
+                ImageColor3 = Library.Theme.Text
+            }):AddToTheme({ImageColor3 = 'Text'})
 
-                -- Contêiner do dropdown que sofrerá redimensionamento por Tween
-                Items["Container"] = Instances:Create("Frame", {
-                    Parent = Dropdown.Section.Items["Content"].Instance,
-                    Size = UDim2New(1, 0, 0, 0),
-                    BackgroundColor3 = Library.Theme.Inline,
-                    Visible = false,
-                    ClipsDescendants = true,
-                }):AddToTheme({BackgroundColor3 = 'Inline'})
-                Instances:Create("UICorner", {Parent = Items["Container"].Instance, CornerRadius = UDimNew(0, 6)})
-                Instances:Create("UIStroke", {Parent = Items["Container"].Instance, Color = Library.Theme.Outline, Thickness = 1}):AddToTheme({Color = 'Outline'})
+            Library:CreateBadge(Items["Main"].Instance, Data)
 
-                local Layout = Instances:Create("UIListLayout", {Parent = Items["Container"].Instance, Padding = UDimNew(0, 4)})
-                local Padding = Instances:Create("UIPadding", {Parent = Items["Container"].Instance, PaddingTop = UDimNew(0, 6), PaddingBottom = UDimNew(0, 6), PaddingLeft = UDimNew(0, 6), PaddingRight = UDimNew(0, 6)})
+            Items["Container"] = Instances:Create("Frame", {
+                Parent = Dropdown.Section.Items["Content"].Instance,
+                Size = UDim2New(1, 0, 0, 0),
+                BackgroundColor3 = Library.Theme.Inline,
+                Visible = false,
+                ClipsDescendants = true,
+            }):AddToTheme({BackgroundColor3 = 'Inline'})
+            Instances:Create("UICorner", {Parent = Items["Container"].Instance, CornerRadius = UDimNew(0, 6)})
+            Instances:Create("UIStroke", {Parent = Items["Container"].Instance, Color = Library.Theme.Outline, Thickness = 1}):AddToTheme({Color = 'Outline'})
 
-                -- Barra de pesquisa interna
-                local DropdownSearchContainer = Instances:Create("Frame", {
-                    Parent = Items["Container"].Instance,
-                    Size = UDim2New(1, 0, 0, 26),
-                    BackgroundColor3 = Library.Theme.Inline,
-                    BorderSizePixel = 0
-                }):AddToTheme({BackgroundColor3 = 'Inline'})
-                Instances:Create("UICorner", { Parent = DropdownSearchContainer.Instance, CornerRadius = UDimNew(0, 4) })
-                Instances:Create("UIStroke", { Parent = DropdownSearchContainer.Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
+            local Layout = Instances:Create("UIListLayout", {Parent = Items["Container"].Instance, Padding = UDimNew(0, 4)})
+            local Padding = Instances:Create("UIPadding", {Parent = Items["Container"].Instance, PaddingTop = UDimNew(0, 6), PaddingBottom = UDimNew(0, 6), PaddingLeft = UDimNew(0, 6), PaddingRight = UDimNew(0, 6)})
 
-                local DropdownSearchInput = Instances:Create("TextBox", {
-                    Parent = DropdownSearchContainer.Instance,
-                    Size = UDim2New(1, -10, 1, 0),
-                    Position = UDim2New(0, 8, 0, 0),
-                    BackgroundTransparency = 1,
-                    Text = "",
-                    PlaceholderText = "Pesquisar item...",
-                    PlaceholderColor3 = FromRGB(120, 120, 130),
-                    TextColor3 = Library.Theme.Text,
-                    FontFace = Library.Font,
-                    TextSize = 13,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    ClearTextOnFocus = false
-                }):AddToTheme({TextColor3 = 'Text'})
+            local DropdownSearchContainer = Instances:Create("Frame", {
+                Parent = Items["Container"].Instance,
+                Size = UDim2New(1, 0, 0, 26),
+                BackgroundColor3 = Library.Theme.Inline,
+                BorderSizePixel = 0
+            }):AddToTheme({BackgroundColor3 = 'Inline'})
+            Instances:Create("UICorner", { Parent = DropdownSearchContainer.Instance, CornerRadius = UDimNew(0, 4) })
+            Instances:Create("UIStroke", { Parent = DropdownSearchContainer.Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
 
-                -- Linha divisória abaixo da pesquisa
-                local Sep = Instances:Create("Frame", {
-                    Parent = Items["Container"].Instance,
-                    Size = UDim2New(1, 0, 0, 1),
-                    BackgroundColor3 = Library.Theme.Outline,
-                    BorderSizePixel = 0
-                }):AddToTheme({BackgroundColor3 = 'Outline'})
+            local DropdownSearchInput = Instances:Create("TextBox", {
+                Parent = DropdownSearchContainer.Instance,
+                Size = UDim2New(1, -10, 1, 0),
+                Position = UDim2New(0, 8, 0, 0),
+                BackgroundTransparency = 1,
+                Text = "",
+                PlaceholderText = "Pesquisar item...",
+                PlaceholderColor3 = FromRGB(120, 120, 130),
+                TextColor3 = Library.Theme.Text,
+                FontFace = Library.Font,
+                TextSize = 13,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                ClearTextOnFocus = false
+            }):AddToTheme({TextColor3 = 'Text'})
 
-                -- ScrollingFrame para conter as opções
-                Items["ScrollList"] = Instances:Create("ScrollingFrame", {
-                    Parent = Items["Container"].Instance,
-                    Size = UDim2New(1, 0, 0, 0),
-                    BackgroundTransparency = 1,
-                    BorderSizePixel = 0,
-                    ScrollBarThickness = 2,
-                    ScrollBarImageColor3 = Library.Theme.Accent,
-                    CanvasSize = UDim2New(0, 0, 0, 0),
-                    AutomaticCanvasSize = Enum.AutomaticSize.Y
-                }):AddToTheme({ScrollBarImageColor3 = 'Accent'})
+            local Sep = Instances:Create("Frame", {
+                Parent = Items["Container"].Instance,
+                Size = UDim2New(1, 0, 0, 1),
+                BackgroundColor3 = Library.Theme.Outline,
+                BorderSizePixel = 0
+            }):AddToTheme({BackgroundColor3 = 'Outline'})
 
-                Instances:Create("UIListLayout", {Parent = Items["ScrollList"].Instance, Padding = UDimNew(0, 3)})
+            Items["ScrollList"] = Instances:Create("ScrollingFrame", {
+                Parent = Items["Container"].Instance,
+                Size = UDim2New(1, 0, 0, 0),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                ScrollBarThickness = 2,
+                ScrollBarImageColor3 = Library.Theme.Accent,
+                CanvasSize = UDim2New(0, 0, 0, 0),
+                AutomaticCanvasSize = Enum.AutomaticSize.Y
+            }):AddToTheme({ScrollBarImageColor3 = 'Accent'})
 
-                local itemButtons = {}
+            Instances:Create("UIListLayout", {Parent = Items["ScrollList"].Instance, Padding = UDimNew(0, 3)})
 
-                -- Filtra itens com base na caixa de texto e recalcula o tamanho
-                local function FilterDropdownItems()
-                    local success, err = pcall(function()
-                        local q = StringLower(DropdownSearchInput.Instance.Text)
-                        local visibleCount = 0
-                        for _, item in ipairs(itemButtons) do
-                            if item.Button and item.Button.Instance then
-                                local matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil
-                                item.Button.Instance.Visible = matches
-                                if matches then
-                                    visibleCount = visibleCount + 1
-                                end
+            local function FilterDropdownItems()
+                local success, err = pcall(function()
+                    local q = StringLower(DropdownSearchInput.Instance.Text)
+                    local visibleCount = 0
+                    for _, item in ipairs(itemButtons) do
+                        if item.Button and item.Button.Instance then
+                            local matches = q == "" or StringFind(StringLower(item.Name or ""), q, 1, true) ~= nil
+                            item.Button.Instance.Visible = matches
+                            if matches then
+                                visibleCount = visibleCount + 1
                             end
                         end
-                        
-                        -- Se o Dropdown estiver aberto, altera o tamanho suavemente na busca
-                        if Dropdown.Open then
-                            local searchHeight = 26 + 4 + 1 + 4
-                            local listHeight = math.min(visibleCount * 28, 140)
-                            local finalHeight = searchHeight + listHeight + 12
-                            
-                            TweenService:Create(Items["ScrollList"].Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                                Size = UDim2New(1, 0, 0, listHeight)
-                            }):Play()
-                            
-                            TweenService:Create(Items["Container"].Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                                Size = UDim2New(1, 0, 0, finalHeight)
-                            }):Play()
-                        end
-                    end)
-                    if not success then
-                        warn("Erro no filtro do dropdown: " .. tostring(err))
-                    end
-                end
-
-                DropdownSearchInput.Instance:GetPropertyChangedSignal("Text"):Connect(FilterDropdownItems)
-                DropdownSearchInput.Instance.FocusLost:Connect(FilterDropdownItems)
-
-                Items["Lock"] = Instances:Create("Frame", {
-                    Parent = Items["Main"].Instance,
-                    Size = UDim2New(1, 45, 1, 0),
-                    Position = UDim2New(0, -10, 0, 0),
-                    BackgroundColor3 = FromRGB(0, 0, 0),
-                    BackgroundTransparency = 1,
-                    Visible = false,
-                    ZIndex = 5
-                })
-                Instances:Create("UICorner", {Parent = Items["Lock"].Instance, CornerRadius = UDimNew(0, 6)})
-
-                -- Atualiza a linha de texto exibida no cabeçalho
-                local function updateMainDisplay()
-                    if Dropdown.Multi then
-                        local selected = {}
-                        for k, v in pairs(Dropdown.Value) do
-                            if v then TableInsert(selected, k) end
-                        end
-                        if #selected == 0 then
-                            Items["Main"].Instance.Text = Dropdown.Name .. ": ..."
-                        else
-                            Items["Main"].Instance.Text = Dropdown.Name .. ": " .. TableConcat(selected, ", ")
-                        end
-                    else
-                        if Dropdown.Value == nil or Dropdown.Value == "" then
-                            Items["Main"].Instance.Text = Dropdown.Name .. ": ..."
-                        else
-                            Items["Main"].Instance.Text = Dropdown.Name .. ": " .. tostring(Dropdown.Value)
-                        end
-                    end
-                end
-
-                function Dropdown:Set(val, state)
-                    if Dropdown.Multi then
-                        if type(val) == "table" then
-                            Dropdown.Value = val
-                        else
-                            Dropdown.Value[val] = (state ~= nil) and state or not Dropdown.Value[val]
-                        end
-                        
-                        -- Atualiza cores nos botões de acordo com o estado ativado/desativado
-                        for _, item in ipairs(itemButtons) do
-                            local active = Dropdown.Value[item.Name]
-                            TweenService:Create(item.Button.Instance, TweenInfo.new(0.15), {
-                                TextTransparency = active and 0 or 0.4,
-                                BackgroundTransparency = active and 0.85 or 1,
-                                BackgroundColor3 = active and Library.Theme.Accent or Library.Theme.Outline
-                            }):Play()
-                        end
-
-                        Library.Flags[Dropdown.Flag] = Dropdown.Value
-                        Library:SafeCall(Dropdown.Callback, Dropdown.Value)
-                    else
-                        Dropdown.Value = val
-                        for _, item in ipairs(itemButtons) do
-                            local active = (item.Name == val)
-                            TweenService:Create(item.Button.Instance, TweenInfo.new(0.15), {
-                                TextTransparency = active and 0 or 0.4,
-                                BackgroundTransparency = active and 0.85 or 1,
-                                BackgroundColor3 = active and Library.Theme.Accent or Library.Theme.Outline
-                            }):Play()
-                        end
-
-                        Library.Flags[Dropdown.Flag] = val
-                        Library:SafeCall(Dropdown.Callback, val)
-                    end
-                    updateMainDisplay()
-                end
-
-                function Dropdown:Refresh(newList)
-                    Dropdown.Items = newList
-                    for _, v in pairs(Items["ScrollList"].Instance:GetChildren()) do 
-                        if v:IsA("TextButton") then v:Destroy() end 
-                    end
-                    TableClear(itemButtons)
-
-                    if Dropdown.Multi and type(Dropdown.Value) ~= "table" then
-                        Dropdown.Value = {}
-                    end
-
-                    for _, v in ipairs(newList) do 
-                        local active = false
-                        if Dropdown.Multi then
-                            active = not not Dropdown.Value[v]
-                        else
-                            active = (Dropdown.Value == v)
-                        end
-
-                        local b = Instances:Create("TextButton", {
-                            Parent = Items["ScrollList"].Instance, 
-                            Size = UDim2New(1, 0, 0, 25), 
-                            BackgroundTransparency = active and 0.85 or 1, 
-                            BackgroundColor3 = active and Library.Theme.Accent or Library.Theme.Outline,
-                            Text = v, 
-                            TextColor3 = Library.Theme.Text, 
-                            TextTransparency = active and 0 or 0.4,
-                            Active = true,
-                            FontFace = Library.Font, 
-                            TextSize = 14
-                        }):AddToTheme({TextColor3 = "Text"})
-                        Instances:Create("UICorner", {Parent = b.Instance, CornerRadius = UDimNew(0, 4)})
-                        TableInsert(itemButtons, {Button = b, Name = v})
-
-                        b:Connect("MouseEnter", function()
-                            local currentActive = false
-                            if Dropdown.Multi then
-                                currentActive = not not Dropdown.Value[v]
-                            else
-                                currentActive = (Dropdown.Value == v)
-                            end
-                            if not currentActive then
-                                TweenService:Create(b.Instance, TweenInfo.new(0.12), {TextTransparency = 0.1, BackgroundTransparency = 0.9}):Play()
-                            end
-                        end)
-                        b:Connect("MouseLeave", function()
-                            local currentActive = false
-                            if Dropdown.Multi then
-                                currentActive = not not Dropdown.Value[v]
-                            else
-                                currentActive = (Dropdown.Value == v)
-                            end
-                            if not currentActive then
-                                TweenService:Create(b.Instance, TweenInfo.new(0.12), {TextTransparency = 0.4, BackgroundTransparency = 1}):Play()
-                            end
-                        end)
-
-                        b:Connect("MouseButton1Click", function()
-                            if Dropdown.Multi then
-                                Dropdown:Set(v)
-                            else
-                                Dropdown:Set(v)
-                                Dropdown:SetOpen(false)
-                            end
-                        end)
                     end
                     
-                    updateMainDisplay()
-                    FilterDropdownItems()
+                    if Dropdown.Open then
+                        local searchHeight = 26 + 4 + 1 + 4
+                        local listHeight = math.min(visibleCount * 28, 140)
+                        local finalHeight = searchHeight + listHeight + 12
+                        
+                        TweenService:Create(Items["ScrollList"].Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                            Size = UDim2New(1, 0, 0, listHeight)
+                        }):Play()
+                        
+                        TweenService:Create(Items["Container"].Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                            Size = UDim2New(1, 0, 0, finalHeight)
+                        }):Play()
+                    end
+                end)
+                if not success then
+                    warn("Erro no filtro do dropdown: " .. tostring(err))
                 end
             end
 
-            -- Controla a abertura do Dropdown aplicando interpolação (Tween)
+            DropdownSearchInput.Instance:GetPropertyChangedSignal("Text"):Connect(FilterDropdownItems)
+            DropdownSearchInput.Instance.FocusLost:Connect(FilterDropdownItems)
+
+            Items["Lock"] = Instances:Create("Frame", {
+                Parent = Items["Main"].Instance,
+                Size = UDim2New(1, 45, 1, 0),
+                Position = UDim2New(0, -10, 0, 0),
+                BackgroundColor3 = FromRGB(0, 0, 0),
+                BackgroundTransparency = 1,
+                Visible = false,
+                ZIndex = 5
+            })
+            Instances:Create("UICorner", {Parent = Items["Lock"].Instance, CornerRadius = UDimNew(0, 6)})
+
+            local function updateMainDisplay()
+                if Dropdown.Multi then
+                    local selected = {}
+                    for k, v in pairs(Dropdown.Value) do
+                        if v then TableInsert(selected, k) end
+                    end
+                    if #selected == 0 then
+                        Items["Main"].Instance.Text = Dropdown.Name .. ": ..."
+                    else
+                        Items["Main"].Instance.Text = Dropdown.Name .. ": " .. TableConcat(selected, ", ")
+                    end
+                else
+                    if Dropdown.Value == nil or Dropdown.Value == "" then
+                        Items["Main"].Instance.Text = Dropdown.Name .. ": ..."
+                    else
+                        Items["Main"].Instance.Text = Dropdown.Name .. ": " .. tostring(Dropdown.Value)
+                    end
+                end
+            end
+
+            function Dropdown:Set(val, state)
+                if Dropdown.Multi then
+                    if type(val) == "table" then
+                        Dropdown.Value = val
+                    else
+                        Dropdown.Value[val] = (state ~= nil) and state or not Dropdown.Value[val]
+                    end
+                    
+                    for _, item in ipairs(itemButtons) do
+                        local active = Dropdown.Value[item.Name]
+                        TweenService:Create(item.Button.Instance, TweenInfo.new(0.15), {
+                            TextTransparency = active and 0 or 0.4,
+                            BackgroundTransparency = active and 0.85 or 1,
+                            BackgroundColor3 = active and Library.Theme.Accent or Library.Theme.Outline
+                        }):Play()
+                    end
+
+                    Library.Flags[Dropdown.Flag] = Dropdown.Value
+                    Library:SafeCall(Dropdown.Callback, Dropdown.Value)
+                else
+                    Dropdown.Value = val
+                    for _, item in ipairs(itemButtons) do
+                        local active = (item.Name == val)
+                        TweenService:Create(item.Button.Instance, TweenInfo.new(0.15), {
+                            TextTransparency = active and 0 or 0.4,
+                            BackgroundTransparency = active and 0.85 or 1,
+                            BackgroundColor3 = active and Library.Theme.Accent or Library.Theme.Outline
+                        }):Play()
+                    end
+
+                    Library.Flags[Dropdown.Flag] = val
+                    Library:SafeCall(Dropdown.Callback, val)
+                end
+                updateMainDisplay()
+            end
+
+            function Dropdown:Refresh(newList)
+                Dropdown.Items = newList
+                for _, v in pairs(Items["ScrollList"].Instance:GetChildren()) do 
+                    if v:IsA("TextButton") then v:Destroy() end 
+                end
+                TableClear(itemButtons)
+
+                if Dropdown.Multi and type(Dropdown.Value) ~= "table" then
+                    Dropdown.Value = {}
+                end
+
+                for _, v in ipairs(newList) do 
+                    local active = false
+                    if Dropdown.Multi then
+                        active = not not Dropdown.Value[v]
+                    else
+                        active = (Dropdown.Value == v)
+                    end
+
+                    local b = Instances:Create("TextButton", {
+                        Parent = Items["ScrollList"].Instance, 
+                        Size = UDim2New(1, 0, 0, 25), 
+                        BackgroundTransparency = active and 0.85 or 1, 
+                        BackgroundColor3 = active and Library.Theme.Accent or Library.Theme.Outline,
+                        Text = v, 
+                        TextColor3 = Library.Theme.Text, 
+                        TextTransparency = active and 0 or 0.4,
+                        Active = true,
+                        FontFace = Library.Font, 
+                        TextSize = 14
+                    }):AddToTheme({TextColor3 = "Text"})
+                    Instances:Create("UICorner", {Parent = b.Instance, CornerRadius = UDimNew(0, 4)})
+                    TableInsert(itemButtons, {Button = b, Name = v})
+
+                    b:Connect("MouseEnter", function()
+                        local currentActive = false
+                        if Dropdown.Multi then
+                            currentActive = not not Dropdown.Value[v]
+                        else
+                            currentActive = (Dropdown.Value == v)
+                        end
+                        if not currentActive then
+                            TweenService:Create(b.Instance, TweenInfo.new(0.12), {TextTransparency = 0.1, BackgroundTransparency = 0.9}):Play()
+                        end
+                    end)
+                    b:Connect("MouseLeave", function()
+                        local currentActive = false
+                        if Dropdown.Multi then
+                            currentActive = not not Dropdown.Value[v]
+                        else
+                            currentActive = (Dropdown.Value == v)
+                        end
+                        if not currentActive then
+                            TweenService:Create(b.Instance, TweenInfo.new(0.12), {TextTransparency = 0.4, BackgroundTransparency = 1}):Play()
+                        end
+                    end)
+
+                    b:Connect("MouseButton1Click", function()
+                        if Dropdown.Multi then
+                            Dropdown:Set(v)
+                        else
+                            Dropdown:Set(v)
+                            Dropdown:SetOpen(false)
+                        end
+                    end)
+                end
+                
+                updateMainDisplay()
+                FilterDropdownItems()
+            end
+
             function Dropdown:SetOpen(Bool)
                 Dropdown.Open = Bool
                 
@@ -3683,7 +3664,7 @@ do
             return Dropdown 
         end
 
-        -- SELETOR DE CORES DA SEÇÃO (COLORPICKER)
+        -- COLORPICKER DA SEÇÃO
         Library.Sections.Colorpicker = function(self, Data)
             Data = Data or {}
             local Colorpicker = {
@@ -3732,7 +3713,7 @@ do
             return Colorpicker
         end
 
-        -- TEXTO SIMPLES (LABEL)
+        -- LABEL
         Library.Sections.Label = function(self, Text)
             local Label = {Section = self, Text = Text}
             local l = Instances:Create("TextLabel", {Parent = Label.Section.Items["Content"].Instance, Text = Text, FontFace = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 15, BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Left})
