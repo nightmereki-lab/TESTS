@@ -254,7 +254,6 @@ do
                     local NewX = StartPos.X.Offset + DragDelta.X
                     local NewY = StartPos.Y.Offset + DragDelta.Y
 
-                    -- CORREÇÃO: ScreenGui não possui AbsoluteSize. Validação de GuiObject adicionada.
                     local ParentSize = (Gui.Parent and Gui.Parent:IsA("GuiObject")) and Gui.Parent.AbsoluteSize or Camera.ViewportSize
                     local GuiSize = Gui.AbsoluteSize
                     
@@ -395,7 +394,6 @@ do
 
     local CustomFont = {} do
         function CustomFont:New(Name, Weight, Style, Data)
-            -- CORREÇÃO: Fallback adicionado para prevenir crashes em ambientes sem FS / CustomAsset
             local success, fontObj = pcall(function()
                 if writefile and readfile and isfile and getcustomasset then
                     if not isfile(Data.Id) then 
@@ -786,7 +784,6 @@ do
     end
 
     Library.Connect = function(self, Event, Callback, Name)
-        -- CORREÇÃO: Incremento do número de conexões ativado
         self.UnnamedConnections = self.UnnamedConnections + 1
         Name = Name or StringFormat("connection_number_%s_%s", self.UnnamedConnections, HttpService:GenerateGUID(false))
 
@@ -915,7 +912,6 @@ do
         end
     end
 
-    -- CORREÇÃO: Elimina vazamentos de memória limpando elementos de tema que foram destruídos
     Library.ChangeTheme = function(self, Theme, Color)
         self.Theme[Theme] = Color
         local activeItems = {}
@@ -2115,7 +2111,6 @@ do
                 Username.TextSize = 16
                 Username.TextColor3 = Library.Theme.Text
 
-                -- CORREÇÃO: Pcall e verificação adicionadas para evitar crashes em executores sem FS
                 local anonConfigPath = "midnight_lib/anonymous_config.json"
                 local isAnonymous = false
 
@@ -2395,7 +2390,7 @@ do
                         Size = UDim2New(1, 0, 0, 40),
                         Position = UDim2New(0, 0, 0, 5),
                         BackgroundTransparency = 1,
-                        TextXAlignment = Enum.TextXAlignment.Center,
+                        TextXAlignment = Enum.TextXAlignment.Left,
                         ZIndex = 25002
                     })
 
@@ -3593,6 +3588,160 @@ do
             return Dropdown 
         end
 
+        -- CAIXA DE TEXTO (INPUT)
+        Library.Sections.Input = function(self, Data)
+            Data = Data or {}
+            local Input = {
+                Section = self,
+                Name = Data.Name or "Input",
+                Placeholder = Data.Placeholder or "Digite algo...",
+                Default = Data.Default or "",
+                Flag = Data.Flag or Library:NextFlag(),
+                Callback = Data.Callback or function() end,
+                Value = ""
+            }
+
+            local Items = {} do
+                Items["Main"] = Instances:Create("Frame", {
+                    Parent = Input.Section.Items["Content"].Instance,
+                    Size = UDim2New(1, 0, 0, 30),
+                    BackgroundTransparency = 1
+                })
+
+                Items["Text"] = Instances:Create("TextLabel", {
+                    Parent = Items["Main"].Instance,
+                    FontFace = Library.Font,
+                    TextColor3 = Library.Theme["Text"],
+                    Text = Input.Name,
+                    Size = UDim2New(0.4, 0, 1, 0),
+                    BackgroundTransparency = 1,
+                    TextSize = 16,
+                    TextXAlignment = Enum.TextXAlignment.Left
+                }):AddToTheme({TextColor3 = 'Text'})
+
+                Items["BoxContainer"] = Instances:Create("Frame", {
+                    Parent = Items["Main"].Instance,
+                    Size = UDim2New(0, 150, 1, 0),
+                    Position = UDim2New(1, -150, 0, 0),
+                    BackgroundColor3 = Library.Theme.Inline,
+                    BorderSizePixel = 0
+                }):AddToTheme({BackgroundColor3 = 'Inline'})
+                Instances:Create("UICorner", { Parent = Items["BoxContainer"].Instance, CornerRadius = UDimNew(0, 6) })
+                Instances:Create("UIStroke", { Parent = Items["BoxContainer"].Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
+
+                Items["TextBox"] = Instances:Create("TextBox", {
+                    Parent = Items["BoxContainer"].Instance,
+                    Size = UDim2New(1, -16, 1, 0),
+                    Position = UDim2New(0, 8, 0, 0),
+                    BackgroundTransparency = 1,
+                    Text = Input.Default,
+                    PlaceholderText = Input.Placeholder,
+                    PlaceholderColor3 = FromRGB(120, 120, 130),
+                    TextColor3 = Library.Theme.Text,
+                    FontFace = Library.Font,
+                    TextSize = 14,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    ClearTextOnFocus = false
+                }):AddToTheme({TextColor3 = 'Text'})
+            end
+
+            function Input:Set(Value)
+                Input.Value = Value
+                Items["TextBox"].Instance.Text = Value
+                Library.Flags[Input.Flag] = Value
+                Library:SafeCall(Input.Callback, Value)
+            end
+
+            function Input:Get() return Input.Value end
+
+            Items["TextBox"]:Connect("FocusLost", function(EnterPressed)
+                Input:Set(Items["TextBox"].Instance.Text)
+            end)
+
+            Input:Set(Input.Default)
+            Input.Section.Window:RegisterElement(Items["Main"].Instance, "Input", Input.Name, Input.Section, Input.Section.Page)
+            return Input
+        end
+
+        -- PARÁGRAFO (PARAGRAPH)
+        Library.Sections.Paragraph = function(self, Data)
+            Data = Data or {}
+            local Paragraph = {
+                Section = self,
+                Title = Data.Title or Data.Name or "Aviso",
+                Content = Data.Content or Data.Text or "Texto explicativo...",
+            }
+
+            local Items = {} do
+                Items["Main"] = Instances:Create("Frame", {
+                    Parent = Paragraph.Section.Items["Content"].Instance,
+                    Size = UDim2New(1, 0, 0, 0),
+                    BackgroundColor3 = Library.Theme.Inline,
+                    AutomaticSize = Enum.AutomaticSize.Y
+                }):AddToTheme({BackgroundColor3 = 'Inline'})
+                Instances:Create("UICorner", { Parent = Items["Main"].Instance, CornerRadius = UDimNew(0, 6) })
+                Instances:Create("UIStroke", { Parent = Items["Main"].Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
+
+                -- Faixa de detalhe estilosa na esquerda
+                Items["Strip"] = Instances:Create("Frame", {
+                    Parent = Items["Main"].Instance,
+                    Size = UDim2New(0, 4, 1, 0),
+                    BackgroundColor3 = Library.Theme.Accent,
+                    BorderSizePixel = 0
+                }):AddToTheme({BackgroundColor3 = 'Accent'})
+                Instances:Create("UICorner", { Parent = Items["Strip"].Instance, CornerRadius = UDimNew(0, 4) })
+
+                local list = Instances:Create("UIListLayout", {
+                    Parent = Items["Main"].Instance,
+                    Padding = UDimNew(0, 4)
+                })
+
+                local padding = Instances:Create("UIPadding", {
+                    Parent = Items["Main"].Instance,
+                    PaddingLeft = UDimNew(0, 14),
+                    PaddingRight = UDimNew(0, 10),
+                    PaddingTop = UDimNew(0, 8),
+                    PaddingBottom = UDimNew(0, 8)
+                })
+
+                Items["TitleLabel"] = Instances:Create("TextLabel", {
+                    Parent = Items["Main"].Instance,
+                    FontFace = Library.Font,
+                    TextColor3 = Library.Theme.Accent,
+                    Text = Paragraph.Title,
+                    Size = UDim2New(1, 0, 0, 18),
+                    BackgroundTransparency = 1,
+                    TextSize = 15,
+                    TextXAlignment = Enum.TextXAlignment.Left
+                }):AddToTheme({TextColor3 = 'Accent'})
+
+                Items["ContentLabel"] = Instances:Create("TextLabel", {
+                    Parent = Items["Main"].Instance,
+                    FontFace = Library.Font,
+                    TextColor3 = Library.Theme.Text,
+                    Text = Paragraph.Content,
+                    Size = UDim2New(1, 0, 0, 0),
+                    BackgroundTransparency = 1,
+                    TextSize = 13,
+                    TextTransparency = 0.3,
+                    TextWrapped = true,
+                    AutomaticSize = Enum.AutomaticSize.Y,
+                    TextXAlignment = Enum.TextXAlignment.Left
+                }):AddToTheme({TextColor3 = 'Text'})
+            end
+
+            function Paragraph:SetTitle(Text)
+                Items["TitleLabel"].Instance.Text = tostring(Text)
+            end
+
+            function Paragraph:SetContent(Text)
+                Items["ContentLabel"].Instance.Text = tostring(Text)
+            end
+
+            Paragraph.Section.Window:RegisterElement(Items["Main"].Instance, "Paragraph", Paragraph.Title, Paragraph.Section, Paragraph.Section.Page)
+            return Paragraph
+        end
+
         -- COLORPICKER DA SEÇÃO
         Library.Sections.Colorpicker = function(self, Data)
             Data = Data or {}
@@ -3660,6 +3809,8 @@ do
     function Library.Sections:AddButton(Data) return self:Button(Data) end
     function Library.Sections:AddSlider(Data) return self:Slider(Data) end
     function Library.Sections:AddDropdown(Data) return self:Dropdown(Data) end
+    function Library.Sections:AddInput(Data) return self:Input(Data) end
+    function Library.Sections:AddParagraph(Data) return self:Paragraph(Data) end
     function Library.Sections:AddColorpicker(Data) return self:Colorpicker(Data) end
     function Library.Sections:AddLabel(Text) return self:Label(Text) end
 
