@@ -237,6 +237,11 @@ do
                     local ParentPos = Vector2New(0, 0)
                     if Gui.Parent and Gui.Parent:IsA("GuiObject") then
                         ParentPos = Gui.Parent.AbsolutePosition
+                    else
+                        -- CORREÇÃO: Compensa dinamicamente o deslocamento da Topbar/Gui Inset do Roblox
+                        local GuiService = game:GetService("GuiService")
+                        local Inset, _ = GuiService:GetGuiInset()
+                        ParentPos = Vector2New(0, -Inset.Y)
                     end
                     
                     local RelativePos = Gui.AbsolutePosition - ParentPos
@@ -1877,7 +1882,7 @@ do
         end)
 
         Library:Connect(UserInputService.InputBegan, function(Input)
-            if Keybind.Value == "None" then return end
+            if Keybind.Value == "None" or Keybind.Value == "" or Keybind.Picking then return end
 
             local targetInput = tostring(Input.KeyCode) == Keybind.Key or tostring(Input.UserInputType) == Keybind.Key
             if targetInput then
@@ -1896,7 +1901,7 @@ do
         end)
 
         Library:Connect(UserInputService.InputEnded, function(Input)
-            if Keybind.Value == "None" then return end
+            if Keybind.Value == "None" or Keybind.Value == "" or Keybind.Picking then return end
 
             local targetInput = tostring(Input.KeyCode) == Keybind.Key or tostring(Input.UserInputType) == Keybind.Key
             if targetInput then
