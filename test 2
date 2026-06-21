@@ -173,7 +173,7 @@ do
     local Tween = {} do
         Tween.__index = Tween
         Tween.Create = function(self, Item, Info, Goal, IsRawItem)
-            Item = IsRawItem and Item or Item.Instance
+            Item = IsRawItemand Item or Item.Instance
             Info = Info or TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction)
             local NewTween = { Tween = TweenService:Create(Item, Info, Goal), Info = Info, Goal = Goal, Item = Item }
             NewTween.Tween:Play()
@@ -1494,7 +1494,7 @@ do
                 Library.IsInteracting = true
                 Colorpicker:SlideHue(Input)
 
-                if HueChanged then return end
+                if HeroChanged then return end
                 HeroChanged = Input.Changed:Connect(function()
                     if Input.UserInputState == Enum.UserInputState.End then
                         Colorpicker.SlidingHue = false
@@ -2697,7 +2697,6 @@ do
                 
                 local SelectedConfig = "None"
 
-                -- NOVO: Estrutura lógica do Auto-Load Config
                 local autoloadPath = "midnight_lib/autoload.json"
                 local autoloadData = {Enabled = false, Config = "None"}
 
@@ -2746,7 +2745,6 @@ do
                     ConfigDropdown:Refresh(cleanFiles)
                 end
 
-                -- NOVO: Interruptor de ativação do Auto-Load
                 local AutoloadToggle = ConfigSec:AddToggle({
                     Name = "Auto-Load Selected Config",
                     Default = autoloadData.Enabled,
@@ -2880,8 +2878,7 @@ do
             task.defer(function()
                 if Window and Window.AddConfigPage then
                     Window:AddConfigPage()
-
-                    -- NOVO: Verifica e executa o carregamento automático após inicializar todas as dependências
+                    
                     if isfile and readfile and isfile("midnight_lib/autoload.json") then
                         local success, decoded = pcall(function()
                             return HttpService:JSONDecode(readfile("midnight_lib/autoload.json"))
@@ -3450,6 +3447,11 @@ do
                     Callback = Data.KeybindCallback
                 })
             end
+
+            -- CORREÇÃO: Vincula a alteração de Toggles à tabela global de SetFlags
+            Library.SetFlags[Toggle.Flag] = function(Value)
+                Toggle:Set(Value)
+            end
             
             Toggle.Section.Window:RegisterElement(Items["Toggle"].Instance, "Toggle", Toggle.Name, Toggle.Section, Toggle.Page)
             return Toggle 
@@ -3544,7 +3546,10 @@ do
                 Set(val)
             end
 
-            local Dragging = false
+            function Slider:Set(Value)
+                Set(Value)
+            end
+
             Items["Bar"]:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
                     Dragging = true
@@ -3579,7 +3584,13 @@ do
                 end
             end)
 
-            Set(Slider.Value)
+            Slider:Set(Slider.Value)
+
+            -- CORREÇÃO: Vincula a alteração de Sliders à tabela global de SetFlags
+            Library.SetFlags[Slider.Flag] = function(Value)
+                Slider:Set(Value)
+            end
+
             Slider.Section.Window:RegisterElement(Items["Main"].Instance, "Slider", Slider.Name, Slider.Section, Slider.Section.Page)
             return Slider 
         end
@@ -3926,6 +3937,11 @@ do
 
             Dropdown:Refresh(Dropdown.Items)
             if Dropdown.Locked then Dropdown:SetLock(true) end
+
+            -- CORREÇÃO: Vincula a alteração de Dropdowns à tabela global de SetFlags
+            Library.SetFlags[Dropdown.Flag] = function(Value)
+                Dropdown:Set(Value)
+            end
             
             Dropdown.Section.Window:RegisterElement(Items["Main"].Instance, "Dropdown", Dropdown.Name, Dropdown.Section, Dropdown.Section.Page)
             return Dropdown 
@@ -4002,6 +4018,12 @@ do
             end)
 
             Input:Set(Input.Default)
+
+            -- CORREÇÃO: Vincula a alteração de Inputs (caixas de texto) à tabela global de SetFlags
+            Library.SetFlags[Input.Flag] = function(Value)
+                Input:Set(Value)
+            end
+
             Input.Section.Window:RegisterElement(Items["Main"].Instance, "Input", Input.Name, Input.Section, Input.Section.Page)
             return Input
         end
