@@ -238,7 +238,6 @@ do
                     if Gui.Parent and Gui.Parent:IsA("GuiObject") then
                         ParentPos = Gui.Parent.AbsolutePosition
                     else
-                        -- CORREÇÃO: Compensa dinamicamente o deslocamento da Topbar/Gui Inset do Roblox
                         local GuiService = game:GetService("GuiService")
                         local Inset, _ = GuiService:GetGuiInset()
                         ParentPos = Vector2New(0, -Inset.Y)
@@ -1496,12 +1495,12 @@ do
                 Colorpicker:SlideHue(Input)
 
                 if HueChanged then return end
-                HueChanged = Input.Changed:Connect(function()
+                HeroChanged = Input.Changed:Connect(function()
                     if Input.UserInputState == Enum.UserInputState.End then
                         Colorpicker.SlidingHue = false
                         Library.IsInteracting = false
-                        HueChanged:Disconnect()
-                        HueChanged = nil
+                        HeroChanged:Disconnect()
+                        HeroChanged = nil
                     end
                 end)
             end
@@ -2697,11 +2696,31 @@ do
                 Instances:Create("UIStroke", { Parent = TextBox.Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = "Outline"})
                 
                 local SelectedConfig = "None"
+
+                -- NOVO: Estrutura lógica do Auto-Load Config
+                local autoloadPath = "midnight_lib/autoload.json"
+                local autoloadData = {Enabled = false, Config = "None"}
+
+                if isfile and readfile and isfile(autoloadPath) then
+                    local success, decoded = pcall(function()
+                        return HttpService:JSONDecode(readfile(autoloadPath))
+                    end)
+                    if success and decoded then
+                        autoloadData = decoded
+                    end
+                end
+
                 local ConfigDropdown = ConfigSec:AddDropdown({
                     Name = "Select Config",
                     Items = {},
                     Callback = function(val)
                         SelectedConfig = val
+                        if autoloadData.Enabled and val ~= "None" and val ~= "" then
+                            autoloadData.Config = val
+                            if writefile then
+                                pcall(writefile, autoloadPath, HttpService:JSONEncode(autoloadData))
+                            end
+                        end
                     end
                 })
                 
@@ -2726,6 +2745,26 @@ do
                     end
                     ConfigDropdown:Refresh(cleanFiles)
                 end
+
+                -- NOVO: Interruptor de ativação do Auto-Load
+                local AutoloadToggle = ConfigSec:AddToggle({
+                    Name = "Auto-Load Selected Config",
+                    Default = autoloadData.Enabled,
+                    Callback = function(state)
+                        if not writefile then return end
+                        if state then
+                            if SelectedConfig == "None" or SelectedConfig == "" then
+                                Library:Notify({Title = "Aviso", Content = "Selecione uma configuração no Dropdown primeiro.", Duration = 4, Type = "RISK"})
+                                return
+                            end
+                            autoloadData.Enabled = true
+                            autoloadData.Config = SelectedConfig
+                        else
+                            autoloadData.Enabled = false
+                        end
+                        pcall(writefile, autoloadPath, HttpService:JSONEncode(autoloadData))
+                    end
+                })
                 
                 ConfigSec:AddButton({
                     Name = "Create / Save Config",
@@ -2841,6 +2880,31 @@ do
             task.defer(function()
                 if Window and Window.AddConfigPage then
                     Window:AddConfigPage()
+
+                    -- NOVO: Verifica e executa o carregamento automático após inicializar todas as dependências
+                    if isfile and readfile and isfile("midnight_lib/autoload.json") then
+                        local success, decoded = pcall(function()
+                            return HttpService:JSONDecode(readfile("midnight_lib/autoload.json"))
+                        end)
+                        if success and decoded and decoded.Enabled and decoded.Config then
+                            local configPath = Library.Folders.Configs .. "/" .. decoded.Config .. ".json"
+                            if isfile(configPath) then
+                                local configData = readfile(configPath)
+                                local loaded, err = Library:LoadConfig(configData)
+                                if loaded then
+                                    Library:Notify({
+                                        Title = "Autoload",
+                                        Content = "Configuração '" .. decoded.Config .. "' carregada automaticamente!",
+                                        Duration = 5,
+                                        Type = "SAFE"
+                                    })
+                                else
+                                    warn("Erro no Autoload: " .. tostring(err))
+                                end
+                            end
+                        end
+                    end
+
                 end
             end)
 
@@ -3287,7 +3351,6 @@ do
                 Library:SafeCall(Toggle.Callback, Value)
             end
 
-            -- NOVO: Método de atalho integrado no Toggle
             function Toggle:AddKeybind(KeybindData)
                 KeybindData = KeybindData or {}
                 local KBFlag = KeybindData.Flag or Library:NextFlag()
