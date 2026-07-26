@@ -488,7 +488,7 @@ do
             TextSize = 18,
             Size = UDim2New(1, 0, 0, 50),
             BackgroundTransparency = 1,
-            TextXAlignment = Enum.TextXAlignment.Center,
+            TextXAlignment = Enum.TextXAlignment.Left,
             ZIndex = baseZIndex + 2
         })
 
@@ -965,7 +965,6 @@ do
     Library.CreateColorpicker = function(self, Data)
         local Colorpicker = {
             Flag = Data.Flag, 
-            SubName = Data.SubName,
             Hue = 0,
             Saturation = 0,
             Value = 0,
@@ -2589,7 +2588,7 @@ do
                                 TextSize = 14,
                                 Size = UDim2New(1, 0, 0, 50),
                                 BackgroundTransparency = 1,
-                                TextXAlignment = Enum.TextXAlignment.Center,
+                                TextXAlignment = Enum.TextXAlignment.Left,
                                 ZIndex = 25004
                             })
                         end
@@ -2746,14 +2745,21 @@ do
                     ConfigDropdown:Refresh(cleanFiles)
                 end
 
-                local AutoloadToggle = ConfigSec:AddToggle({
+                -- MELHORIA: Trava de recursão adicionada para resetar o toggle em falhas de validação
+                local isAutoloadUpdating = false
+                local AutoloadToggle
+                AutoloadToggle = ConfigSec:AddToggle({
                     Name = "Auto-Load Selected Config",
                     Default = autoloadData.Enabled,
                     Callback = function(state)
+                        if isAutoloadUpdating then return end
                         if not writefile then return end
                         if state then
                             if SelectedConfig == "None" or SelectedConfig == "" then
                                 Library:Notify({Title = "Aviso", Content = "Selecione uma configuração no Dropdown primeiro.", Duration = 4, Type = "RISK"})
+                                isAutoloadUpdating = true
+                                AutoloadToggle:Set(false)
+                                isAutoloadUpdating = false
                                 return
                             end
                             autoloadData.Enabled = true
@@ -3103,6 +3109,18 @@ do
                     end
                 end
                 
+                -- MELHORIA: Efeitos Visuais de Hover nas Sub-Abas adicionados
+                Button:Connect("MouseEnter", function()
+                    if not SubTab.Active then
+                        TweenService:Create(Button.Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Inline:Lerp(Color3.new(1,1,1), 0.05)}):Play()
+                    end
+                end)
+                Button:Connect("MouseLeave", function()
+                    if not SubTab.Active then
+                        TweenService:Create(Button.Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Inline}):Play()
+                    end
+                end)
+
                 Button:Connect("MouseButton1Click", function()
                     for _, tab in ipairs(self.SubTabs) do
                         tab:Turn(tab == SubTab)
@@ -3349,6 +3367,7 @@ do
                 Library:SafeCall(Toggle.Callback, Value)
             end
 
+            -- MELHORIA: Suporte a cancelamento e limpeza de tecla com Escape / Backspace adicionados
             function Toggle:AddKeybind(KeybindData)
                 KeybindData = KeybindData or {}
                 local KBFlag = KeybindData.Flag or Library:NextFlag()
@@ -3396,10 +3415,17 @@ do
                     KeyButton.Instance.Text = "[...]"
                     local Connection
                     Connection = UserInputService.InputBegan:Connect(function(Input)
-                        if Input.UserInputType == Enum.UserInputType.Keyboard then
-                            Set(Input.KeyCode)
+                        if Input.KeyCode == Enum.KeyCode.Escape or Input.KeyCode == Enum.KeyCode.Backspace then
+                            Keybind.Key = "None"
+                            Keybind.Value = "None"
+                            KeyButton.Instance.Text = "[None]"
+                            Library.Flags[KBFlag] = "None"
                         else
-                            Set(Input.UserInputType)
+                            if Input.UserInputType == Enum.UserInputType.Keyboard then
+                                Set(Input.KeyCode)
+                            else
+                                Set(Input.UserInputType)
+                            end
                         end
                         Connection:Disconnect()
                     end)
@@ -3449,7 +3475,6 @@ do
                 })
             end
 
-            -- CORREÇÃO: Vincula a alteração de Toggles à tabela global de SetFlags
             Library.SetFlags[Toggle.Flag] = function(Value)
                 Toggle:Set(Value)
             end
@@ -3524,7 +3549,7 @@ do
                 Instances:Create("UIStroke", {Parent = Items["SliderDot"].Instance, Color = Library.Theme.Outline, Thickness = 1})
             end
 
-            local Dragging = false -- Adicionado: Declaração da variável de controle
+            local Dragging = false 
 
             local function Set(val)
                 local step = 10 ^ Slider.Decimals
@@ -3589,7 +3614,6 @@ do
 
             Slider:Set(Slider.Value)
 
-            -- CORREÇÃO: Vincula a alteração de Sliders à tabela global de SetFlags
             Library.SetFlags[Slider.Flag] = function(Value)
                 Slider:Set(Value)
             end
@@ -3753,6 +3777,7 @@ do
             })
             Instances:Create("UICorner", {Parent = Items["Lock"].Instance, CornerRadius = UDimNew(0, 6)})
 
+            -- MELHORIA: Truncamento do texto de seleção múltipla (evita estouro visual de texto)
             local function updateMainDisplay()
                 if Dropdown.Multi then
                     local selected = {}
@@ -3762,13 +3787,21 @@ do
                     if #selected == 0 then
                         Items["Main"].Instance.Text = Dropdown.Name .. ": ..."
                     else
-                        Items["Main"].Instance.Text = Dropdown.Name .. ": " .. TableConcat(selected, ", ")
+                        local joined = TableConcat(selected, ", ")
+                        if StringLen(joined) > 28 then
+                            joined = string.sub(joined, 1, 25) .. "..."
+                        end
+                        Items["Main"].Instance.Text = Dropdown.Name .. ": " .. joined
                     end
                 else
                     if Dropdown.Value == nil or Dropdown.Value == "" then
                         Items["Main"].Instance.Text = Dropdown.Name .. ": ..."
                     else
-                        Items["Main"].Instance.Text = Dropdown.Name .. ": " .. tostring(Dropdown.Value)
+                        local valStr = tostring(Dropdown.Value)
+                        if StringLen(valStr) > 28 then
+                            valStr = string.sub(valStr, 1, 25) .. "..."
+                        end
+                        Items["Main"].Instance.Text = Dropdown.Name .. ": " .. valStr
                     end
                 end
             end
@@ -3941,7 +3974,6 @@ do
             Dropdown:Refresh(Dropdown.Items)
             if Dropdown.Locked then Dropdown:SetLock(true) end
 
-            -- CORREÇÃO: Vincula a alteração de Dropdowns à tabela global de SetFlags
             Library.SetFlags[Dropdown.Flag] = function(Value)
                 Dropdown:Set(Value)
             end
@@ -4016,13 +4048,25 @@ do
 
             function Input:Get() return Input.Value end
 
+            -- MELHORIA: Feedback visual Dinâmico (Foco e Desfoco da Caixa de Texto)
+            local boxStroke = Items["BoxContainer"].Instance:FindFirstChildOfClass("UIStroke")
+            Items["TextBox"]:Connect("Focused", function()
+                TweenService:Create(Items["BoxContainer"].Instance, TweenInfo.new(0.12), {BackgroundColor3 = Library.Theme.Inline:Lerp(Library.Theme.Accent, 0.05)}):Play()
+                if boxStroke then
+                    TweenService:Create(boxStroke, TweenInfo.new(0.12), {Color = Library.Theme.Accent}):Play()
+                end
+            end)
+
             Items["TextBox"]:Connect("FocusLost", function(EnterPressed)
+                TweenService:Create(Items["BoxContainer"].Instance, TweenInfo.new(0.12), {BackgroundColor3 = Library.Theme.Inline}):Play()
+                if boxStroke then
+                    TweenService:Create(boxStroke, TweenInfo.new(0.12), {Color = Library.Theme.Outline}):Play()
+                end
                 Input:Set(Items["TextBox"].Instance.Text)
             end)
 
             Input:Set(Input.Default)
 
-            -- CORREÇÃO: Vincula a alteração de Inputs (caixas de texto) à tabela global de SetFlags
             Library.SetFlags[Input.Flag] = function(Value)
                 Input:Set(Value)
             end
@@ -4071,12 +4115,36 @@ do
                     PaddingBottom = UDimNew(0, 8)
                 })
 
-                Items["TitleLabel"] = Instances:Create("TextLabel", {
+                -- MELHORIA: Suporte a Ícones Opcionais de forma nativa e alinhada
+                local HeaderFrame = Instances:Create("Frame", {
                     Parent = Items["Main"].Instance,
+                    Size = UDim2New(1, 0, 0, 20),
+                    BackgroundTransparency = 1
+                })
+                Instances:Create("UIListLayout", {
+                    Parent = HeaderFrame.Instance,
+                    FillDirection = Enum.FillDirection.Horizontal,
+                    Padding = UDimNew(0, 6),
+                    VerticalAlignment = Enum.VerticalAlignment.Center
+                })
+
+                local iconId = Data.Icon or Data.icon
+                if iconId then
+                    Items["Icon"] = Instances:Create("ImageLabel", {
+                        Parent = HeaderFrame.Instance,
+                        Size = UDim2New(0, 16, 0, 16),
+                        BackgroundTransparency = 1,
+                        Image = iconId,
+                        ImageColor3 = Library.Theme.Accent
+                    }):AddToTheme({ImageColor3 = 'Accent'})
+                end
+
+                Items["TitleLabel"] = Instances:Create("TextLabel", {
+                    Parent = HeaderFrame.Instance,
                     FontFace = Library.Font,
                     TextColor3 = Library.Theme.Accent,
                     Text = Paragraph.Title,
-                    Size = UDim2New(1, 0, 0, 18),
+                    Size = UDim2New(1, -25, 1, 0),
                     BackgroundTransparency = 1,
                     TextSize = 15,
                     TextXAlignment = Enum.TextXAlignment.Left
