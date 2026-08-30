@@ -84,6 +84,7 @@ do
     Library = {
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
+        ToggleKey = Enum.KeyCode.RightControl,
         Flags = {},
         IsInteracting = false,
         Tween = {
@@ -2115,9 +2116,9 @@ do
                 Username.TextSize = 16
                 Username.TextColor3 = Library.Theme.Text
 
-                local anonConfigPath = "midnight_lib/anonymous_config.json"
-                local isAnonymous = false
+                local isAnonymous = true
 
+                local anonConfigPath = "midnight_lib/anonymous_config.json"
                 if isfile and readfile and isfile(anonConfigPath) then
                     local success, decoded = pcall(function()
                         return HttpService:JSONDecode(readfile(anonConfigPath))
@@ -2127,7 +2128,7 @@ do
                     end
                 elseif writefile then
                     pcall(function()
-                        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = false}))
+                        writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = true}))
                     end)
                 end
 
@@ -2149,104 +2150,6 @@ do
                 end
 
                 updateProfileDisplay()
-
-                local ProfileButton = InstanceNew("TextButton")
-                ProfileButton.Size = UDim2New(1, 0, 1, 0)
-                ProfileButton.BackgroundTransparency = 1
-                ProfileButton.Text = ""
-                ProfileButton.Active = true
-                ProfileButton.Parent = BottomTab
-                ProfileButton.ZIndex = 5
-
-                local currentDialog = nil
-
-                local function toggleAnonymousMenu()
-                    if currentDialog then
-                        local oldDialog = currentDialog
-                        currentDialog = nil
-                        local closeTween = TweenService:Create(oldDialog, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2New(0, 0, 0, 0)})
-                        closeTween:Play()
-                        closeTween.Completed:Connect(function()
-                            oldDialog:Destroy()
-                        end)
-                        return
-                    end
-
-                    local dialog = InstanceNew("Frame")
-                    dialog.Name = "AnonymousDialog"
-                    dialog.Size = UDim2New(0, 260, 0, 80)
-                    dialog.Position = UDim2New(0.5, -130, 0.5, -40)
-                    dialog.BackgroundColor3 = Library.Theme.Background
-                    dialog.Parent = Items["MainFrame"].Instance
-                    dialog.ZIndex = 10000
-                    currentDialog = dialog
-
-                    local stroke = InstanceNew("UIStroke")
-                    stroke.Color = Library.Theme.Accent
-                    stroke.Thickness = 1.5
-                    stroke.Parent = dialog
-
-                    local corner = InstanceNew("UICorner")
-                    corner.CornerRadius = UDimNew(0, 8)
-                    corner.Parent = dialog
-
-                    local label = InstanceNew("TextLabel")
-                    label.Size = UDim2New(0.6, 0, 1, 0)
-                    label.Position = UDim2New(0.08, 0, 0, 0)
-                    label.Text = "Modo Anônimo"
-                    label.TextColor3 = Library.Theme.Text
-                    label.FontFace = Library.Font
-                    label.TextSize = 16
-                    label.TextXAlignment = Enum.TextXAlignment.Left
-                    label.BackgroundTransparency = 1
-                    label.ZIndex = 10001
-                    label.Parent = dialog
-
-                    local toggleContainer = InstanceNew("TextButton")
-                    toggleContainer.Size = UDim2New(0, 45, 0, 24)
-                    toggleContainer.Position = UDim2New(0.92, -45, 0.5, -12)
-                    toggleContainer.BackgroundColor3 = isAnonymous and Library.Theme.Accent or Library.Theme.Element
-                    toggleContainer.Text = ""
-                    toggleContainer.Active = true
-                    toggleContainer.AutoButtonColor = false
-                    toggleContainer.ZIndex = 10001
-                    toggleContainer.Parent = dialog
-
-                    local tcCorner = InstanceNew("UICorner")
-                    tcCorner.CornerRadius = UDimNew(1, 0)
-                    tcCorner.Parent = toggleContainer
-
-                    local circle = InstanceNew("Frame")
-                    circle.Size = UDim2New(0, 16, 0, 16)
-                    circle.Position = isAnonymous and UDim2New(1, -20, 0.5, -8) or UDim2New(0, 4, 0.5, -8)
-                    circle.BackgroundColor3 = FromRGB(255, 255, 255)
-                    circle.ZIndex = 10002
-                    circle.Parent = toggleContainer
-
-                    local circleCorner = InstanceNew("UICorner")
-                    circleCorner.CornerRadius = UDimNew(1, 0)
-                    circleCorner.Parent = circle
-
-                    toggleContainer.MouseButton1Click:Connect(function()
-                        isAnonymous = not isAnonymous
-                        if writefile then
-                            pcall(function()
-                                writefile(anonConfigPath, HttpService:JSONEncode({Anonymous = isAnonymous}))
-                            end)
-                        end
-                        updateProfileDisplay()
-
-                        local targetPos = isAnonymous and UDim2New(1, -20, 0.5, -8) or UDim2New(0, 4, 0.5, -8)
-                        local targetColor = isAnonymous and Library.Theme.Accent or Library.Theme.Element
-                        
-                        TweenService:Create(circle, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
-                        TweenService:Create(toggleContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetColor}):Play()
-                    end)
-                end
-
-                ProfileButton.MouseButton1Click:Connect(function()
-                    toggleAnonymousMenu()
-                end)
 
                 local Countdown = InstanceNew("TextLabel")
                 Countdown.Parent = BottomTab
@@ -2658,7 +2561,7 @@ do
             end
 
             function Window:AddConfigPage()
-                local ConfigPage = self:AddPage({Name = "Settings", Icon = "rbxassetid://11419114175"})
+                local ConfigPage = self:AddPage({Name = "Config", Icon = "rbxassetid://11419114175"})
                 
                 local ConfigSec = ConfigPage:AddSection({Name = "Save Manager"})
                 
@@ -2745,7 +2648,6 @@ do
                     ConfigDropdown:Refresh(cleanFiles)
                 end
 
-                -- MELHORIA: Trava de recursão adicionada para resetar o toggle em falhas de validação
                 local isAutoloadUpdating = false
                 local AutoloadToggle
                 AutoloadToggle = ConfigSec:AddToggle({
@@ -2837,7 +2739,133 @@ do
                         Library:Notify({Title = "Sucesso", Content = "Lista de configurações atualizada.", Duration = 3, Type = "SAFE"})
                     end
                 })
+
+                -- SEÇÃO: COMPARTILHAMENTO E EXPLICAÇÃO
+                local CopySec = ConfigPage:AddSection({Name = "Share Config"})
                 
+                CopySec:AddParagraph({
+                    Title = "Como utilizar o sistema",
+                    Content = "Use o gerenciador acima para criar e salvar os perfis localmente.\n\nSe deseja compartilhar seus ajustes com amigos ou usá-los em outro dispositivo, clique no botão de cópia abaixo para salvar todo o código de configurações atual diretamente em sua área de transferência para colagem rápida.",
+                    Icon = "rbxassetid://11419114175"
+                })
+
+                CopySec:AddButton({
+                    Name = "Copy Config to Clipboard",
+                    Callback = function()
+                        local rawData = Library:GetConfig()
+                        if setclipboard then
+                            local ok, err = pcall(setclipboard, rawData)
+                            if ok then
+                                Library:Notify({Title = "Configurações", Content = "Configuração copiada para a área de transferência!", Duration = 4, Type = "SAFE"})
+                            else
+                                Library:Notify({Title = "Erro", Content = "Erro ao copiar para área de transferência: " .. tostring(err), Duration = 5, Type = "BUG"})
+                            end
+                        else
+                            Library:Notify({Title = "Não Suportado", Content = "Seu Executor não possui suporte para colar no clipboard.", Duration = 4, Type = "RISK"})
+                        end
+                    end
+                })
+
+                -- SEÇÃO: AUTO-EXECUTE CONFIGURÁVEL
+                local AutoExecSec = ConfigPage:AddSection({Name = "Auto-Execute Loader"})
+                
+                local aePath = "midnight_lib/auto_execute.json"
+                local aeData = {Enabled = false, Source = ""}
+                if isfile and readfile and isfile(aePath) then
+                    local success, decoded = pcall(function()
+                        return HttpService:JSONDecode(readfile(aePath))
+                    end)
+                    if success and decoded then
+                        aeData = decoded
+                    end
+                end
+
+                AutoExecSec:AddToggle({
+                    Name = "Enable Auto-Execute on Launch",
+                    Default = aeData.Enabled,
+                    Callback = function(state)
+                        aeData.Enabled = state
+                        if writefile then
+                            pcall(writefile, aePath, HttpService:JSONEncode(aeData))
+                        end
+                    end
+                })
+
+                local aeInput = AutoExecSec:AddInput({
+                    Name = "Script / Loadstring URL",
+                    Placeholder = "loadstring(game:HttpGet(...))()",
+                    Default = aeData.Source,
+                    Callback = function(val)
+                        aeData.Source = val
+                        if writefile then
+                            pcall(writefile, aePath, HttpService:JSONEncode(aeData))
+                        end
+                    end
+                })
+
+                AutoExecSec:AddButton({
+                    Name = "Test Auto-Execute Script Now",
+                    Callback = function()
+                        local src = aeData.Source
+                        if not src or src == "" then
+                            Library:Notify({Title = "Aviso", Content = "O campo de script está vazio.", Duration = 4, Type = "RISK"})
+                            return
+                        end
+                        task.spawn(function()
+                            local ok, err = pcall(function()
+                                if src:match("^https?://") then
+                                    local code = game:HttpGet(src)
+                                    local func, lerr = loadstring(code)
+                                    if func then func() else error(lerr) end
+                                else
+                                    local func, lerr = loadstring(src)
+                                    if func then func() else error(lerr) end
+                                end
+                            end)
+                            if ok then
+                                Library:Notify({Title = "Sucesso", Content = "Script carregado com sucesso!", Duration = 4, Type = "SAFE"})
+                            else
+                                Library:Notify({Title = "Auto-Execute Erro", Content = tostring(err), Duration = 5, Type = "BUG"})
+                            end
+                        end)
+                    end
+                })
+
+                -- SEÇÃO: GUI ATALHO (KEYBIND)
+                local GuiSec = ConfigPage:AddSection({Name = "GUI Keybind"})
+                
+                local function parseKey(keyStr)
+                    if not keyStr then return nil end
+                    keyStr = tostring(keyStr)
+                    if keyStr:find("Enum.KeyCode.") then
+                        local name = keyStr:gsub("Enum.KeyCode.", "")
+                        local success, enumObj = pcall(function() return Enum.KeyCode[name] end)
+                        if success then return enumObj end
+                    elseif keyStr:find("Enum.UserInputType.") then
+                        local name = keyStr:gsub("Enum.UserInputType.", "")
+                        local success, enumObj = pcall(function() return Enum.UserInputType[name] end)
+                        if success then return enumObj end
+                    end
+                    return nil
+                end
+
+                GuiSec:AddKeybind({
+                    Name = "Toggle Menu Keybind",
+                    Default = Enum.KeyCode.RightControl,
+                    Flag = "UI_Menu_Toggle_Bind",
+                    Mode = "Toggle",
+                    Callback = function()
+                        local bindFlag = Library.Flags["UI_Menu_Toggle_Bind"]
+                        if bindFlag and bindFlag.Key then
+                            local parsed = parseKey(bindFlag.Key)
+                            if parsed then
+                                Library.ToggleKey = parsed
+                            end
+                        end
+                    end
+                })
+
+                -- SEÇÃO: TEMAS Custom
                 local ThemeSec = ConfigPage:AddSection({Name = "Theme Customization"})
                 
                 local ThemeKeys = {"Accent", "Background", "Inline", "Outline", "Element", "Text"}
@@ -2886,6 +2914,7 @@ do
                 if Window and Window.AddConfigPage then
                     Window:AddConfigPage()
                     
+                    -- Processamento do Autoload
                     if isfile and readfile and isfile("midnight_lib/autoload.json") then
                         local success, decoded = pcall(function()
                             return HttpService:JSONDecode(readfile("midnight_lib/autoload.json"))
@@ -2909,6 +2938,60 @@ do
                         end
                     end
 
+                    -- Processamento do Auto-Execute no Launch
+                    local aePath = "midnight_lib/auto_execute.json"
+                    if isfile and readfile and isfile(aePath) then
+                        local success, decoded = pcall(function()
+                            return HttpService:JSONDecode(readfile(aePath))
+                        end)
+                        if success and decoded and decoded.Enabled and decoded.Source and decoded.Source ~= "" then
+                            task.spawn(function()
+                                local ok, err = pcall(function()
+                                    local src = decoded.Source
+                                    if src:match("^https?://") then
+                                        local code = game:HttpGet(src)
+                                        local func, lerr = loadstring(code)
+                                        if func then func() else error(lerr) end
+                                    else
+                                        local func, lerr = loadstring(src)
+                                        if func then func() else error(lerr) end
+                                    end
+                                end)
+                                if ok then
+                                    Library:Notify({
+                                        Title = "Auto-Execute",
+                                        Content = "Auto-Execute inicializado com sucesso!",
+                                        Duration = 5,
+                                        Type = "SAFE"
+                                    })
+                                else
+                                    warn("Erro no Auto-Execute inicial: " .. tostring(err))
+                                    Library:Notify({
+                                        Title = "Auto-Execute Erro",
+                                        Content = tostring(err),
+                                        Duration = 6,
+                                        Type = "BUG"
+                                    })
+                                end
+                            end)
+                        end
+                    end
+                end
+            end)
+
+            -- Ouvinte global de Inputs para ocultar/exibir UI via tecla dinâmica
+            Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
+                if GameProcessed then return end
+                
+                local activeKey = Library.ToggleKey
+                local bindFlag = Library.Flags["UI_Menu_Toggle_Bind"]
+                if bindFlag and bindFlag.Key then
+                    local parsed = parseKey(bindFlag.Key)
+                    if parsed then activeKey = parsed end
+                end
+
+                if Input.KeyCode == activeKey or Input.UserInputType == activeKey then
+                    Window:SetOpen(not Window.IsOpen)
                 end
             end)
 
@@ -3109,7 +3192,6 @@ do
                     end
                 end
                 
-                -- MELHORIA: Efeitos Visuais de Hover nas Sub-Abas adicionados
                 Button:Connect("MouseEnter", function()
                     if not SubTab.Active then
                         TweenService:Create(Button.Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Inline:Lerp(Color3.new(1,1,1), 0.05)}):Play()
@@ -3367,7 +3449,6 @@ do
                 Library:SafeCall(Toggle.Callback, Value)
             end
 
-            -- MELHORIA: Suporte a cancelamento e limpeza de tecla com Escape / Backspace adicionados
             function Toggle:AddKeybind(KeybindData)
                 KeybindData = KeybindData or {}
                 local KBFlag = KeybindData.Flag or Library:NextFlag()
@@ -3777,7 +3858,6 @@ do
             })
             Instances:Create("UICorner", {Parent = Items["Lock"].Instance, CornerRadius = UDimNew(0, 6)})
 
-            -- MELHORIA: Truncamento do texto de seleção múltipla (evita estouro visual de texto)
             local function updateMainDisplay()
                 if Dropdown.Multi then
                     local selected = {}
@@ -3808,6 +3888,9 @@ do
 
             function Dropdown:Set(val, state)
                 if Dropdown.Multi then
+                    if type(Dropdown.Value) ~= "table" then
+                        Dropdown.Value = {}
+                    end
                     if type(val) == "table" then
                         Dropdown.Value = val
                     else
@@ -4048,7 +4131,6 @@ do
 
             function Input:Get() return Input.Value end
 
-            -- MELHORIA: Feedback visual Dinâmico (Foco e Desfoco da Caixa de Texto)
             local boxStroke = Items["BoxContainer"].Instance:FindFirstChildOfClass("UIStroke")
             Items["TextBox"]:Connect("Focused", function()
                 TweenService:Create(Items["BoxContainer"].Instance, TweenInfo.new(0.12), {BackgroundColor3 = Library.Theme.Inline:Lerp(Library.Theme.Accent, 0.05)}):Play()
@@ -4115,7 +4197,6 @@ do
                     PaddingBottom = UDimNew(0, 8)
                 })
 
-                -- MELHORIA: Suporte a Ícones Opcionais de forma nativa e alinhada
                 local HeaderFrame = Instances:Create("Frame", {
                     Parent = Items["Main"].Instance,
                     Size = UDim2New(1, 0, 0, 20),
@@ -4175,6 +4256,51 @@ do
 
             Paragraph.Section.Window:RegisterElement(Items["Main"].Instance, "Paragraph", Paragraph.Title, Paragraph.Section, Paragraph.Section.Page)
             return Paragraph
+        end
+
+        -- KEYBIND EXCLUSIVO DE SEÇÃO (BUGFIX DE MAPEAMENTO)
+        Library.Sections.Keybind = function(self, Data)
+            Data = Data or {}
+            local Keybind = {
+                Section = self,
+                Name = Data.Name or "Keybind",
+                Flag = Data.Flag or Library:NextFlag(),
+                Callback = Data.Callback or function() end
+            }
+            
+            local Items = {} do
+                Items["Main"] = Instances:Create("Frame", {
+                    Parent = Keybind.Section.Items["Content"].Instance,
+                    Size = UDim2New(1, 0, 0, 24),
+                    BackgroundTransparency = 1
+                })
+                
+                Items["Text"] = Instances:Create("TextLabel", {
+                    Parent = Items["Main"].Instance,
+                    FontFace = Library.Font,
+                    TextColor3 = Library.Theme["Text"],
+                    Text = Keybind.Name,
+                    Size = UDim2New(0, 0, 1, 0),
+                    BackgroundTransparency = 1,
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    TextSize = 16,
+                    TextXAlignment = Enum.TextXAlignment.Left
+                }):AddToTheme({TextColor3 = 'Text'})
+                
+                local KB, KBItems = Library:CreateKeybind({
+                    Parent = Items["Main"],
+                    Flag = Keybind.Flag,
+                    Default = Data.Default,
+                    Mode = Data.Mode,
+                    Callback = Data.Callback
+                })
+                
+                KBItems["KeyButton"].Instance.AnchorPoint = Vector2New(1, 0.5)
+                KBItems["KeyButton"].Instance.Position = UDim2New(1, 0, 0.5, 0)
+            end
+            
+            Keybind.Section.Window:RegisterElement(Items["Main"].Instance, "Keybind", Keybind.Name, Keybind.Section, Keybind.Section.Page)
+            return Keybind
         end
 
         -- COLORPICKER DA SEÇÃO
@@ -4248,6 +4374,7 @@ do
     function Library.Sections:AddInput(Data) return self:Input(Data) end
     function Library.Sections:AddParagraph(Data) return self:Paragraph(Data) end
     function Library.Sections:AddColorpicker(Data) return self:Colorpicker(Data) end
+    function Library.Sections:AddKeybind(Data) return self:Keybind(Data) end
     function Library.Sections:AddLabel(Text) return self:Label(Text) end
 
     getgenv().Library = Library
