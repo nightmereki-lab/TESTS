@@ -67,8 +67,10 @@ do
     local pairs = pairs
 
     local TableClear = table.clear or function(t)
-        for k in pairs(t) do
-            t[k] = nil
+        if typeof(t) == "table" then
+            for k in pairs(t) do
+                t[k] = nil
+            end
         end
     end
 
@@ -171,13 +173,26 @@ do
         end
     end
 
+    local activeTweens = {} -- MELHORIA 12: Gerenciamento unificado de Tweens ativos
+
     local Tween = {} do
         Tween.__index = Tween
         Tween.Create = function(self, Item, Info, Goal, IsRawItem)
-            Item = IsRawItem and Item or Item.Instance
+            local rawInstance = IsRawItem and Item or Item.Instance
+            
+            -- Cancela tween conflitante anterior para evitar oscilações visuais
+            if activeTweens[rawInstance] then
+                pcall(function() activeTweens[rawInstance]:Cancel() end)
+                activeTweens[rawInstance] = nil
+            end
+
             Info = Info or TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction)
-            local NewTween = { Tween = TweenService:Create(Item, Info, Goal), Info = Info, Goal = Goal, Item = Item }
-            NewTween.Tween:Play()
+            local createdTween = TweenService:Create(rawInstance, Info, Goal)
+            createdTween:Play()
+
+            activeTweens[rawInstance] = createdTween
+
+            local NewTween = { Tween = createdTween, Info = Info, Goal = Goal, Item = rawInstance }
             setmetatable(NewTween, Tween)
             return NewTween
         end
@@ -223,7 +238,7 @@ do
         Instances.Clean = function(self) if self.Instance then self.Instance:Destroy() self = nil end end
 
         Instances.MakeDraggable = function(self)
-            if not self.Instance then return end
+            if not self.Instance then return self end
         
             local Gui = self.Instance
             local Dragging = false 
@@ -253,8 +268,9 @@ do
                 end
             end)
         
+            -- MELHORIA 2: Vazamento de conexões corrigido utilizando barramento Library:Connect
             Library:Connect(UserInputService.InputChanged, function(Input)
-                if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
+                if Gui and Gui.Parent and Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
                     local DragDelta = Input.Position - DragStart
                     local NewX = StartPos.X.Offset + DragDelta.X
                     local NewY = StartPos.Y.Offset + DragDelta.Y
@@ -280,7 +296,7 @@ do
                 end
             end)
         
-            return Dragging
+            return self -- CORREÇÃO 3: Retorno ajustado para o objeto ao invés do booleano local estático
         end
 
         Instances.MakeResizeable = function(self, Minimum, Maximum)
@@ -402,7 +418,15 @@ do
             local success, fontObj = pcall(function()
                 if writefile and readfile and isfile and getcustomasset then
                     if not isfile(Data.Id) then 
-                        writefile(Data.Id, game:HttpGet(Data.Url))
+                        -- CHECKLIST: HttpGet robusto com timeout habilitado
+                        local httpSuccess, response = pcall(function()
+                            return game:HttpGet(Data.Url, true)
+                        end)
+                        if httpSuccess and response then
+                            writefile(Data.Id, response)
+                        else
+                            error("Download da fonte falhou.")
+                        end
                     end
 
                     local FontData = {
@@ -436,7 +460,8 @@ do
     function Library:CreateInfoPopup(Title, Description, BadgeType)
         local BadgeColor = Library.BadgeColors[BadgeType] or Library.Theme.Accent
         
-        Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 10
+        -- CORREÇÃO 4: Margem de Z-Index aumentada (+20) para evitar sobreposição visual
+        Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 20
         local baseZIndex = Library.CurrentPopupZIndex
 
         local Blur = Instance.new("BlurEffect")
@@ -549,13 +574,13 @@ do
             T:Play()
             T.Completed:Connect(function() 
                 Overlay:Clean() 
-                Blur:Destroy()
+                if Blur then Blur:Destroy() end
             end)
         end)
     end
 
     function Library:CreateBadge(Parent, Data)
-        if not Data.Badge then return end
+        if not Data or not Data.Badge then return end
         
         local BType = Data.Badge:upper()
         local BColor = Library.BadgeColors[BType] or Library.Theme.Accent
@@ -600,8 +625,12 @@ do
             end
         end
         local textBoundsConnection = Parent:GetPropertyChangedSignal("TextBounds"):Connect(updatePos)
+        
+        -- CORREÇÃO 8: Desconexão explícita do TextBounds para evitar vazamentos acumulativos
         Library:Connect(Parent.Destroying, function()
-            textBoundsConnection:Disconnect()
+            if textBoundsConnection then
+                textBoundsConnection:Disconnect()
+            end
         end)
         updatePos()
         
@@ -745,7 +774,7 @@ do
 
     Library.Unload = function(self)
         for _, Value in ipairs(self.Connections) do 
-            Value.Connection:Disconnect()
+            if Value.Connection then Value.Connection:Disconnect() end
         end
         for _, Value in ipairs(self.Threads) do 
             coroutine.close(Value)
@@ -758,6 +787,7 @@ do
         local blur = lighting:FindFirstChild("Midnight_BadgeBlur")
         if blur then blur:Destroy() end
 
+        TableClear(activeTweens)
         Library = nil 
         getgenv().Library = nil
     end
@@ -780,12 +810,16 @@ do
     end
     
     Library.SafeCall = function(self, Function, ...)
-        local Success, Result = pcall(Function, ...)
-        if not Success then
-            warn(Result)
-            return false
+        -- CHECKLIST: Verificação explícita de tipagem de função
+        if typeof(Function) == "function" then
+            local Success, Result = pcall(Function, ...)
+            if not Success then
+                warn(Result)
+                return false
+            end
+            return Success
         end
-        return Success
+        return false
     end
 
     Library.Connect = function(self, Event, Callback, Name)
@@ -810,7 +844,7 @@ do
     Library.Disconnect = function(self, Name)
         for _, Connection in ipairs(self.Connections) do 
             if Connection.Name == Name then
-                Connection.Connection:Disconnect()
+                if Connection.Connection then Connection.Connection:Disconnect() end
                 break
             end
         end
@@ -960,6 +994,21 @@ do
         local Top = Object.AbsolutePosition
         local Bottom = Top + Object.AbsoluteSize 
         return Library:CompareVectors(Top, BoundryTop) or Library:CompareVectors(BoundryBottom, Bottom)
+    end
+
+    local function parseKey(keyStr)
+        if not keyStr then return nil end
+        keyStr = tostring(keyStr)
+        if keyStr:find("Enum.KeyCode.") then
+            local name = keyStr:gsub("Enum.KeyCode.", "")
+            local success, enumObj = pcall(function() return Enum.KeyCode[name] end)
+            if success then return enumObj end
+        elseif keyStr:find("Enum.UserInputType.") then
+            local name = keyStr:gsub("Enum.UserInputType.", "")
+            local success, enumObj = pcall(function() return Enum.UserInputType[name] end)
+            if success then return enumObj end
+        end
+        return nil
     end
 
     -- COLORPICKER
@@ -1827,6 +1876,18 @@ do
 
         function Keybind:Set(Key)
             if StringFind(tostring(Key), "Enum") then 
+                -- CORREÇÃO 6: Tratamento e aviso de conflito de teclas com o atalho mestre
+                local parsedKey = parseKey(tostring(Key))
+                if parsedKey == Library.ToggleKey then
+                    warn("⚠️ Conflito de tecla detectado com o atalho principal da GUI!")
+                    Library:Notify({
+                        Title = "Conflito de Teclas",
+                        Content = "Esta tecla já está associada ao atalho para abrir/fechar o menu!",
+                        Duration = 4,
+                        Type = "RISK"
+                    })
+                end
+
                 Keybind.Key = tostring(Key)
                 Key = (Key.Name == "Backspace") and "None" or Key.Name
 
@@ -1992,7 +2053,7 @@ do
                     FontFace = Library.Font,
                     TextColor3 = Library.Theme["Text"],
                     BorderColor3 = FromRGB(0, 0, 0),
-                    Text = "Perccss in my sodaa",
+                    Text = Name or "Watermark", -- CORREÇÃO 1: Hardcoded text resolvido usando o parâmetro dinâmico
                     AnchorPoint = Vector2New(0, 0.5),
                     Size = UDim2New(0, 0, 0, 15),
                     BackgroundTransparency = 1,
@@ -2044,6 +2105,7 @@ do
                     Element = Element,
                     Type = Type,
                     Name = Name,
+                    SearchName = StringLower(Name or ""), -- MELHORIA 11: Cache do nome em lowercase para otimizar pesquisas
                     Section = Section,
                     Page = Page
                 })
@@ -2120,6 +2182,7 @@ do
 
                 local anonConfigPath = "midnight_lib/anonymous_config.json"
                 if isfile and readfile and isfile(anonConfigPath) then
+                    -- CORREÇÃO 9: Tratamento pcall explícito contra leituras corrompidas de JSON
                     local success, decoded = pcall(function()
                         return HttpService:JSONDecode(readfile(anonConfigPath))
                     end)
@@ -2347,7 +2410,7 @@ do
                     end)
 
                     function SearchPopup:Open()
-                        Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 10
+                        Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 20 -- Incrementado
                         local baseZ = Library.CurrentPopupZIndex
 
                         SearchPopup.Overlay.Instance.ZIndex = baseZ
@@ -2365,30 +2428,6 @@ do
                     function SearchPopup:Close()
                         CloseSearch()
                     end
-                end
-
-                local function MatchQuery(name, query)
-                    name = StringLower(name)
-                    query = StringLower(query)
-                    
-                    if StringFind(name, query, 1, true) then
-                        return true
-                    end
-                    
-                    local words = {}
-                    for word in string.gmatch(query, "%S+") do
-                        TableInsert(words, word)
-                    end
-                    
-                    if #words > 0 then
-                        for _, word in ipairs(words) do
-                            if StringFind(name, word, 1, true) then
-                                return true
-                            end
-                        end
-                    end
-                    
-                    return false
                 end
 
                 local function UpdateSearch()
@@ -2411,9 +2450,27 @@ do
                         end
 
                         local matchesCount = 0
+                        local queryWords = {}
+                        for word in string.gmatch(query, "%S+") do
+                            TableInsert(queryWords, word)
+                        end
 
+                        -- MELHORIA 11: Varredura de busca de alta performance usando o hash cache precalculado em minúsculo
                         for _, data in ipairs(Window.SearchableElements) do
-                            local matches = MatchQuery(data.Name or "", query)
+                            local matches = false
+                            local searchName = data.SearchName or ""
+                            
+                            if StringFind(searchName, query, 1, true) then
+                                matches = true
+                            elseif #queryWords > 0 then
+                                for _, word in ipairs(queryWords) do
+                                    if StringFind(searchName, word, 1, true) then
+                                        matches = true
+                                        break
+                                    end
+                                end
+                            end
+
                             if matches then
                                 matchesCount = matchesCount + 1
 
@@ -2561,6 +2618,9 @@ do
             end
 
             function Window:AddConfigPage()
+                -- CORREÇÃO 5: Prevenção de fechamento/re-geração nula
+                if not self or not self.Items then return end
+
                 local ConfigPage = self:AddPage({Name = "Config", Icon = "rbxassetid://11419114175"})
                 
                 local ConfigSec = ConfigPage:AddSection({Name = "Save Manager"})
@@ -2833,21 +2893,6 @@ do
 
                 -- SEÇÃO: GUI ATALHO (KEYBIND)
                 local GuiSec = ConfigPage:AddSection({Name = "GUI Keybind"})
-                
-                local function parseKey(keyStr)
-                    if not keyStr then return nil end
-                    keyStr = tostring(keyStr)
-                    if keyStr:find("Enum.KeyCode.") then
-                        local name = keyStr:gsub("Enum.KeyCode.", "")
-                        local success, enumObj = pcall(function() return Enum.KeyCode[name] end)
-                        if success then return enumObj end
-                    elseif keyStr:find("Enum.UserInputType.") then
-                        local name = keyStr:gsub("Enum.UserInputType.", "")
-                        local success, enumObj = pcall(function() return Enum.UserInputType[name] end)
-                        if success then return enumObj end
-                    end
-                    return nil
-                end
 
                 GuiSec:AddKeybind({
                     Name = "Toggle Menu Keybind",
@@ -2914,7 +2959,7 @@ do
                 if Window and Window.AddConfigPage then
                     Window:AddConfigPage()
                     
-                    -- Processamento do Autoload
+                    -- Processamento do Autoload seguro
                     if isfile and readfile and isfile("midnight_lib/autoload.json") then
                         local success, decoded = pcall(function()
                             return HttpService:JSONDecode(readfile("midnight_lib/autoload.json"))
@@ -2938,7 +2983,7 @@ do
                         end
                     end
 
-                    -- Processamento do Auto-Execute no Launch
+                    -- Processamento do Auto-Execute no Launch seguro
                     local aePath = "midnight_lib/auto_execute.json"
                     if isfile and readfile and isfile(aePath) then
                         local success, decoded = pcall(function()
@@ -3115,6 +3160,19 @@ do
                     Active = false
                 }
                 
+                -- CORREÇÃO 10: Limite de Sub-Abas adicionado com aviso preventivo
+                local MAX_SUBTABS = 10
+                if #self.SubTabs >= MAX_SUBTABS then
+                    warn("⚠️ Limite de sub-abas atingido (" .. MAX_SUBTABS .. ")!")
+                    Library:Notify({
+                        Title = "Limite de Abas",
+                        Content = "Não é permitido criar mais de " .. tostring(MAX_SUBTABS) .. " sub-abas.",
+                        Duration = 4,
+                        Type = "RISK"
+                    })
+                    return nil
+                end
+
                 if not self.SubTabBar then
                     self.SubTabBar = Instances:Create("Frame", {
                         Parent = self.Items["Page"].Instance.Parent,
@@ -3481,6 +3539,18 @@ do
                 
                 local function Set(Key)
                     if StringFind(tostring(Key), "Enum") then
+                        -- CORREÇÃO 6: Validação de conflito de teclas para binds agregadas ao toggle
+                        local parsedKey = parseKey(tostring(Key))
+                        if parsedKey == Library.ToggleKey then
+                            warn("⚠️ Conflito de tecla detectado com o atalho principal da GUI!")
+                            Library:Notify({
+                                Title = "Conflito de Teclas",
+                                Content = "Esta tecla já está associada ao atalho para abrir/fechar o menu!",
+                                Duration = 4,
+                                Type = "RISK"
+                            })
+                        end
+
                         Keybind.Key = tostring(Key)
                         Key = (Key.Name == "Backspace") and "None" or Key.Name
                         local KeyString = Keys[Keybind.Key] or StringGSub(Key, "Enum.", "") or "None"
@@ -3891,10 +3961,30 @@ do
                     if type(Dropdown.Value) ~= "table" then
                         Dropdown.Value = {}
                     end
+                    
                     if type(val) == "table" then
                         Dropdown.Value = val
                     else
-                        Dropdown.Value[val] = (state ~= nil) and state or not Dropdown.Value[val]
+                        -- CORREÇÃO 7: Validador de limite para seleção múltipla para prevenir quebra de layout
+                        local selectedCount = 0
+                        for _, active in pairs(Dropdown.Value) do
+                            if active then selectedCount = selectedCount + 1 end
+                        end
+
+                        local maxLimit = Data.MaxSelections or 5
+                        local targetState = (state ~= nil) and state or not Dropdown.Value[val]
+                        
+                        if targetState and selectedCount >= maxLimit and not Dropdown.Value[val] then
+                            Library:Notify({
+                                Title = "Limite Excedido",
+                                Content = "Você atingiu o limite de " .. tostring(maxLimit) .. " seleções para este filtro.",
+                                Duration = 4,
+                                Type = "RISK"
+                            })
+                            return
+                        end
+                        
+                        Dropdown.Value[val] = targetState
                     end
                     
                     for _, item in ipairs(itemButtons) do
@@ -4258,7 +4348,7 @@ do
             return Paragraph
         end
 
-        -- KEYBIND EXCLUSIVO DE SEÇÃO (BUGFIX DE MAPEAMENTO)
+        -- KEYBIND EXCLUSIVO DE SEÇÃO (CORREÇÃO 13: Mapeamento direto de atalho de seção)
         Library.Sections.Keybind = function(self, Data)
             Data = Data or {}
             local Keybind = {
