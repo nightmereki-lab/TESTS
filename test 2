@@ -87,7 +87,7 @@ do
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         ToggleKey = Enum.KeyCode.RightControl,
-        AutoExecuteScript = "", -- Propriedade definida estritamente pelo desenvolvedor no loader
+        AutoExecuteScript = "", 
         Flags = {},
         IsInteracting = false,
         Tween = {
@@ -2088,7 +2088,7 @@ do
                 Logo = Data.Logo or Data.logo or "rbxassetid://81441172534384",
                 Pages = {},
                 Items = {},
-                IsOpen = false,
+                IsOpen = true, 
                 MinimizeButton = nil,
                 SearchableElements = {},
                 ScaleObj = nil
@@ -2234,7 +2234,7 @@ do
                     end
                 end)
 
-                Instances:Create("Frame", {
+                instancesBorder = Instances:Create("Frame", {
                     Parent = Items["Sidebar"].Instance,
                     AnchorPoint = Vector2New(1, 0),
                     Position = UDim2New(1, 0, 0, 0),
@@ -2813,6 +2813,7 @@ do
                     end
                 })
 
+                -- MODIFICAÇÃO: Botão de Importação do Clipboard com Prevenção de Colisão e Geração de Arquivo JSON
                 CopySec:AddButton({
                     Name = "Load Config from Clipboard",
                     Callback = function()
@@ -2823,11 +2824,57 @@ do
 
                         local ok, clipboardData = pcall(getclipboard)
                         if ok and clipboardData and clipboardData ~= "" then
-                            local success, err = Library:LoadConfig(clipboardData)
-                            if success then
-                                Library:Notify({Title = "Importado", Content = "Configuração importada e aplicada a partir da área de transferência!", Duration = 4, Type = "SAFE"})
+                            local jsonOk, decoded = pcall(function()
+                                return HttpService:JSONDecode(clipboardData)
+                            end)
+
+                            if jsonOk and decoded then
+                                local desiredName = TextBox.Instance.Text:gsub("^%s*(.-)%s*$", "%1")
+                                if desiredName == "" then
+                                    desiredName = "Imported"
+                                end
+
+                                -- Varredura recursiva de colisões para nomear arquivos
+                                local function getUniqueConfigName(baseName)
+                                    local name = baseName
+                                    local path = Library.Folders.Configs .. "/" .. name .. ".json"
+                                    if not isfile(path) then
+                                        return name
+                                    end
+                                    
+                                    local counter = 1
+                                    while true do
+                                        local newName = name .. "_" .. tostring(counter)
+                                        local newPath = Library.Folders.Configs .. "/" .. newName .. ".json"
+                                        if not isfile(newPath) then
+                                            return newName
+                                        end
+                                        counter = counter + 1
+                                    end
+                                end
+
+                                local uniqueName = getUniqueConfigName(desiredName)
+                                local filePath = Library.Folders.Configs .. "/" .. uniqueName .. ".json"
+
+                                if writefile then
+                                    writefile(filePath, clipboardData)
+                                end
+
+                                RefreshConfigs()
+
+                                local success, err = Library:LoadConfig(clipboardData)
+                                if success then
+                                    Library:Notify({
+                                        Title = "Importado", 
+                                        Content = "Configuração salva como '" .. uniqueName .. "' e aplicada!", 
+                                        Duration = 5, 
+                                        Type = "SAFE"
+                                    })
+                                else
+                                    Library:Notify({Title = "Erro ao Aplicar", Content = "Falha ao injetar dados na interface.", Duration = 4, Type = "BUG"})
+                                end
                             else
-                                Library:Notify({Title = "Erro ao Importar", Content = "Os dados da área de transferência são inválidos para esta UI.", Duration = 4, Type = "BUG"})
+                                Library:Notify({Title = "Erro ao Importar", Content = "Os dados da área de transferência são inválidos (Não são JSON).", Duration = 4, Type = "BUG"})
                             end
                         else
                             Library:Notify({Title = "Erro", Content = "Área de transferência vazia ou falha na leitura.", Duration = 4, Type = "BUG"})
@@ -2836,7 +2883,6 @@ do
                 })
 
                 -- SEÇÃO: AUTO-EXECUTE (TELEPORT RE-RUN) 100% REFORMULADO
-                -- CORREÇÃO: Sem campos de entrada visíveis para o usuário comum. Apenas Parágrafo explicativo + Toggle de controle de teleport.
                 local AutoExecSec = ConfigPage:AddSection({Name = "Auto Re-Execute"})
                 
                 AutoExecSec:AddParagraph({
@@ -2911,30 +2957,34 @@ do
                 RefreshConfigs()
             end
 
+            -- CORREÇÃO: Minimize button reestruturado usando a herança nativa orientada a objetos (Instances:Create)
             if Data.MinimizeButton ~= false then
-                local ToggleButton = InstanceNew("ImageButton")
-                ToggleButton.Name = "ToggleButton"
-                ToggleButton.Parent = Library.Holder.Instance
-                ToggleButton.Size = UDim2New(0, 70, 0, 70)
-                ToggleButton.Position = UDim2New(0.03, 0, 0.4, 0)
-                ToggleButton.BackgroundColor3 = FromRGB(15, 15, 15)
-                ToggleButton.Image = "rbxassetid://128395878680071"
-                ToggleButton.AutoButtonColor = false
-                ToggleButton.ZIndex = 9999
-                Instances:Create("UICorner", {Parent = ToggleButton, CornerRadius = UDimNew(0, 18)})
-                local TS = Instances:Create("UIStroke", {Parent = ToggleButton, Color = Library.Theme.Accent, Thickness = 2.5})
+                local ToggleButton = Instances:Create("ImageButton", {
+                    Parent = Library.Holder.Instance,
+                    Name = "ToggleButton",
+                    Size = UDim2New(0, 70, 0, 70),
+                    Position = UDim2New(0.03, 0, 0.4, 0),
+                    BackgroundColor3 = FromRGB(15, 15, 15),
+                    Image = "rbxassetid://128395878680071",
+                    AutoButtonColor = false,
+                    Active = true,
+                    ZIndex = 9999
+                })
                 
-                ToggleButton.MouseEnter:Connect(function()
-                    TweenService:Create(ToggleButton, TweenInfo.new(0.15), {BackgroundColor3 = FromRGB(25, 25, 25), Size = UDim2New(0, 74, 0, 74)}):Play()
+                Instances:Create("UICorner", {Parent = ToggleButton.Instance, CornerRadius = UDimNew(0, 18)})
+                local TS = Instances:Create("UIStroke", {Parent = ToggleButton.Instance, Color = Library.Theme.Accent, Thickness = 2.5})
+                
+                ToggleButton:Connect("MouseEnter", function()
+                    ToggleButton:Tween(TweenInfo.new(0.15), {BackgroundColor3 = FromRGB(25, 25, 25), Size = UDim2New(0, 74, 0, 74)})
                 end)
-                ToggleButton.MouseLeave:Connect(function()
-                    TweenService:Create(ToggleButton, TweenInfo.new(0.15), {BackgroundColor3 = FromRGB(15, 15, 15), Size = UDim2New(0, 70, 0, 70)}):Play()
+                ToggleButton:Connect("MouseLeave", function()
+                    ToggleButton:Tween(TweenInfo.new(0.15), {BackgroundColor3 = FromRGB(15, 15, 15), Size = UDim2New(0, 70, 0, 70)})
                 end)
 
-                ToggleButton.MouseButton1Click:Connect(function()
+                ToggleButton:Connect("MouseButton1Click", function()
                     Window:SetOpen(not Window.IsOpen)
                 end)
-                Window.MinimizeButton = ToggleButton
+                Window.MinimizeButton = ToggleButton.Instance
             end
 
             setmetatable(Window, Library)
@@ -2968,7 +3018,6 @@ do
                 end
             end)
 
-            -- Ouvinte e registro inteligente de queue_on_teleport (Auto Re-Execute)
             local teleportConnection
             local function setupTeleportListener()
                 if teleportConnection then return end
@@ -3127,7 +3176,6 @@ do
                 end
             end
 
-            -- SISTEMA DE SUB-ABAS (SUB-TABS)
             function Page:AddSubTab(SubTabData)
                 SubTabData = SubTabData or {}
                 local SubTab = {
@@ -4336,6 +4384,7 @@ do
         end
 
         -- KEYBIND EXCLUSIVO DE SEÇÃO (Mapeamento direto de atalho de seção)
+        local InstancesBorder
         Library.Sections.Keybind = function(self, Data)
             Data = Data or {}
             local Keybind = {
