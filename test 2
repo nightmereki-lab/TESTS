@@ -87,6 +87,7 @@ do
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         ToggleKey = Enum.KeyCode.RightControl,
+        AutoExecuteScript = "", -- Propriedade a ser definida pelo desenvolvedor no loader
         Flags = {},
         IsInteracting = false,
         Tween = {
@@ -2793,92 +2794,100 @@ do
                 -- SEÇÃO: COMPARTILHAMENTO E EXPLICAÇÃO REFORMULADA
                 local CopySec = ConfigPage:AddSection({Name = "Share Config"})
                 
-                -- REFORMULADO: Parágrafo com tópicos limpos e organizados (Melhoria Visual)
                 CopySec:AddParagraph({
-                    Title = "Exportar Configurações",
-                    Content = "• Salve seus perfis de forma persistente utilizando o gerenciador acima.\n\n• Use o botão de cópia abaixo para enviar a string JSON atualizada diretamente para sua área de transferência.\n\n• Compartilhe com amigos ou salve em arquivos externos para backup.",
+                    Title = "Exportar / Importar Configurações",
+                    Content = "• Salve seus perfis de forma persistente utilizando o gerenciador acima.\n\n• Clique no botão de cópia abaixo para enviar a sua configuração selecionada para a área de transferência.\n\n• Use o botão de importação para carregar rapidamente qualquer código compartilhado copiado em sua área de transferência.",
                     Icon = "rbxassetid://11419114175"
                 })
 
+                -- MODIFICAÇÃO: Botão de Cópia inteligente de configuração
                 CopySec:AddButton({
-                    Name = "Copy Config to Clipboard",
+                    Name = "Copy Selected/Active Config",
                     Callback = function()
-                        local rawData = Library:GetConfig()
-                        if setclipboard then
-                            local ok, err = pcall(setclipboard, rawData)
+                        if not setclipboard then
+                            Library:Notify({Title = "Não Suportado", Content = "Seu Executor não possui suporte para colar no clipboard.", Duration = 4, Type = "RISK"})
+                            return
+                        end
+
+                        local configToCopy = ""
+                        if SelectedConfig ~= "None" and SelectedConfig ~= "" then
+                            -- Se houver arquivo selecionado no dropdown, copia o conteúdo do arquivo
+                            local path = Library.Folders.Configs .. "/" .. SelectedConfig .. ".json"
+                            if isfile(path) then
+                                configToCopy = readfile(path)
+                            end
+                        else
+                            -- Caso contrário, copia o estado ativo atual da UI
+                            configToCopy = Library:GetConfig()
+                        end
+
+                        if configToCopy ~= "" then
+                            local ok, err = pcall(setclipboard, configToCopy)
                             if ok then
                                 Library:Notify({Title = "Configurações", Content = "Configuração copiada para a área de transferência!", Duration = 4, Type = "SAFE"})
                             else
-                                Library:Notify({Title = "Erro", Content = "Erro ao copiar para área de transferência: " .. tostring(err), Duration = 5, Type = "BUG"})
+                                Library:Notify({Title = "Erro", Content = "Erro ao copiar para clipboard: " .. tostring(err), Duration = 5, Type = "BUG"})
                             end
                         else
-                            Library:Notify({Title = "Não Suportado", Content = "Seu Executor não possui suporte para colar no clipboard.", Duration = 4, Type = "RISK"})
+                            Library:Notify({Title = "Aviso", Content = "Não há nenhuma configuração válida para copiar.", Duration = 4, Type = "RISK"})
                         end
                     end
                 })
 
-                -- SEÇÃO: AUTO-EXECUTE CONFIGURÁVEL
-                local AutoExecSec = ConfigPage:AddSection({Name = "Auto-Execute Loader"})
+                -- MODIFICAÇÃO: Botão de Importação Direta do Clipboard
+                CopySec:AddButton({
+                    Name = "Load Config from Clipboard",
+                    Callback = function()
+                        if not getclipboard then
+                            Library:Notify({Title = "Não Suportado", Content = "Seu Executor não possui suporte para ler a área de transferência.", Duration = 4, Type = "RISK"})
+                            return
+                        end
+
+                        local ok, clipboardData = pcall(getclipboard)
+                        if ok and clipboardData and clipboardData ~= "" then
+                            local success, err = Library:LoadConfig(clipboardData)
+                            if success then
+                                Library:Notify({Title = "Importado", Content = "Configuração importada e aplicada a partir da área de transferência!", Duration = 4, Type = "SAFE"})
+                            else
+                                Library:Notify({Title = "Erro ao Importar", Content = "Os dados da área de transferência são inválidos para esta UI.", Duration = 4, Type = "BUG"})
+                            end
+                        else
+                            Library:Notify({Title = "Erro", Content = "Área de transferência vazia ou falha na leitura.", Duration = 4, Type = "BUG"})
+                        end
+                    end
+                })
+
+                -- SEÇÃO: AUTO-EXECUTE (TELEPORT RE-RUN) REFORMULADO
+                local AutoExecSec = ConfigPage:AddSection({Name = "Auto Re-Execute"})
                 
-                local aePath = "midnight_lib/auto_execute.json"
-                local aeData = {Enabled = false, Source = ""}
-                if isfile and readfile and isfile(aePath) then
+                local autoTeleportPath = "midnight_lib/auto_teleport.json"
+                local autoTeleportData = {Enabled = false}
+                if isfile and readfile and isfile(autoTeleportPath) then
                     local success, decoded = pcall(function()
-                        return HttpService:JSONDecode(readfile(aePath))
+                        return HttpService:JSONDecode(readfile(autoTeleportPath))
                     end)
                     if success and decoded then
-                        aeData = decoded
+                        autoTeleportData = decoded
                     end
                 end
 
+                -- MODIFICAÇÃO: Apenas Toggle de ativação para usar o queue_on_teleport nativo
                 AutoExecSec:AddToggle({
-                    Name = "Enable Auto-Execute on Launch",
-                    Default = aeData.Enabled,
+                    Name = "Auto Re-Execute on Teleport",
+                    Default = autoTeleportData.Enabled,
                     Callback = function(state)
-                        aeData.Enabled = state
+                        autoTeleportData.Enabled = state
                         if writefile then
-                            pcall(writefile, aePath, HttpService:JSONEncode(aeData))
+                            pcall(writefile, autoTeleportPath, HttpService:JSONEncode(autoTeleportData))
                         end
-                    end
-                })
-
-                local aeInput = AutoExecSec:AddInput({
-                    Name = "Script / Loadstring URL",
-                    Placeholder = "loadstring(game:HttpGet(...))()",
-                    Default = aeData.Source,
-                    Callback = function(val)
-                        aeData.Source = val
-                        if writefile then
-                            pcall(writefile, aePath, HttpService:JSONEncode(aeData))
+                        if state then
+                            Library:Notify({
+                                Title = "Ativado",
+                                Content = "O script será automaticamente enfileirado para re-execução após se teletransportar.",
+                                Duration = 4,
+                                Type = "SAFE"
+                            })
                         end
-                    end
-                })
-
-                AutoExecSec:AddButton({
-                    Name = "Test Auto-Execute Script Now",
-                    Callback = function()
-                        local src = aeData.Source
-                        if not src or src == "" then
-                            Library:Notify({Title = "Aviso", Content = "O campo de script está vazio.", Duration = 4, Type = "RISK"})
-                            return
-                        end
-                        task.spawn(function()
-                            local ok, err = pcall(function()
-                                if src:match("^https?://") then
-                                    local code = game:HttpGet(src)
-                                    local func, lerr = loadstring(code)
-                                    if func then func() else error(lerr) end
-                                else
-                                    local func, lerr = loadstring(src)
-                                    if func then func() else error(lerr) end
-                                end
-                            end)
-                            if ok then
-                                Library:Notify({Title = "Sucesso", Content = "Script carregado com sucesso!", Duration = 4, Type = "SAFE"})
-                            else
-                                Library:Notify({Title = "Auto-Execute Erro", Content = tostring(err), Duration = 5, Type = "BUG"})
-                            end
-                        end)
                     end
                 })
 
@@ -2972,46 +2981,41 @@ do
                             end
                         end
                     end
-
-                    local aePath = "midnight_lib/auto_execute.json"
-                    if isfile and readfile and isfile(aePath) then
-                        local success, decoded = pcall(function()
-                            return HttpService:JSONDecode(readfile(aePath))
-                        end)
-                        if success and decoded and decoded.Enabled and decoded.Source and decoded.Source ~= "" then
-                            task.spawn(function()
-                                local ok, err = pcall(function()
-                                    local src = decoded.Source
-                                    if src:match("^https?://") then
-                                        local code = game:HttpGet(src)
-                                        local func, lerr = loadstring(code)
-                                        if func then func() else error(lerr) end
-                                    else
-                                        local func, lerr = loadstring(src)
-                                        if func then func() else error(lerr) end
-                                    end
-                                end)
-                                if ok then
-                                    Library:Notify({
-                                        Title = "Auto-Execute",
-                                        Content = "Auto-Execute inicializado com sucesso!",
-                                        Duration = 5,
-                                        Type = "SAFE"
-                                    })
-                                else
-                                    warn("Erro no Auto-Execute inicial: " .. tostring(err))
-                                    Library:Notify({
-                                        Title = "Auto-Execute Erro",
-                                        Content = tostring(err),
-                                        Duration = 6,
-                                        Type = "BUG"
-                                    })
-                                end
-                            end)
-                        end
-                    end
                 end
             end)
+
+            -- MODIFICAÇÃO: Conexão unificada e inteligente para monitorar e registrar o Teleport Re-Execute
+            local teleportConnection
+            local function setupTeleportListener()
+                if teleportConnection then return end
+                local queue_teleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+                
+                if queue_teleport then
+                    pcall(function()
+                        teleportConnection = Players.LocalPlayer.OnTeleport:Connect(function(State)
+                            if State == Enum.TeleportState.Started then
+                                local isEnabled = false
+                                local autoTeleportPath = "midnight_lib/auto_teleport.json"
+                                
+                                if isfile and readfile and isfile(autoTeleportPath) then
+                                    pcall(function()
+                                        local decoded = HttpService:JSONDecode(readfile(autoTeleportPath))
+                                        isEnabled = decoded.Enabled
+                                    end)
+                                end
+
+                                if isEnabled then
+                                    local scriptToQueue = Library.AutoExecuteScript
+                                    if scriptToQueue and scriptToQueue ~= "" then
+                                        queue_teleport(scriptToQueue)
+                                    end
+                                end
+                            end
+                        end)
+                    end)
+                end
+            end
+            setupTeleportListener()
 
             Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
                 if GameProcessed then return end
@@ -4250,7 +4254,6 @@ do
                 Instances:Create("UICorner", { Parent = Items["Main"].Instance, CornerRadius = UDimNew(0, 6) })
                 Instances:Create("UIStroke", { Parent = Items["Main"].Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
 
-                -- Accent Line (Strip) - Posicionada de forma absoluta na borda esquerda, sem quebrar o fluxo da UIListLayout
                 Items["Strip"] = Instances:Create("Frame", {
                     Parent = Items["Main"].Instance,
                     Size = UDim2New(0, 4, 1, 0),
@@ -4260,13 +4263,11 @@ do
                     ZIndex = 2
                 }):AddToTheme({BackgroundColor3 = 'Accent'})
                 
-                -- Arredonda apenas os cantos esquerdos da faixa de cor para encaixar perfeitamente no frame principal
                 local stripCorner = Instances:Create("UICorner", { 
                     Parent = Items["Strip"].Instance, 
                     CornerRadius = UDimNew(0, 6) 
                 })
 
-                -- Container de Texto - Isola o fluxo vertical de layout dos elementos visuais absolutos
                 local Container = Instances:Create("Frame", {
                     Parent = Items["Main"].Instance,
                     Size = UDim2New(1, -4, 0, 0),
@@ -4349,7 +4350,7 @@ do
             return Paragraph
         end
 
-        -- KEYBIND EXCLUSIVO DE SEÇÃO (CORREÇÃO 13: Mapeamento direto de atalho de seção)
+        -- KEYBIND EXCLUSIVO DE SEÇÃO (Mapeamento direto de atalho de seção)
         Library.Sections.Keybind = function(self, Data)
             Data = Data or {}
             local Keybind = {
@@ -4472,3 +4473,4 @@ do
 end
 
 return Library
+
