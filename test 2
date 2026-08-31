@@ -173,14 +173,13 @@ do
         end
     end
 
-    local activeTweens = {} -- MELHORIA 12: Gerenciamento unificado de Tweens ativos
+    local activeTweens = {}
 
     local Tween = {} do
         Tween.__index = Tween
         Tween.Create = function(self, Item, Info, Goal, IsRawItem)
             local rawInstance = IsRawItem and Item or Item.Instance
             
-            -- Cancela tween conflitante anterior para evitar oscilações visuais
             if activeTweens[rawInstance] then
                 pcall(function() activeTweens[rawInstance]:Cancel() end)
                 activeTweens[rawInstance] = nil
@@ -268,7 +267,6 @@ do
                 end
             end)
         
-            -- MELHORIA 2: Vazamento de conexões corrigido utilizando barramento Library:Connect
             Library:Connect(UserInputService.InputChanged, function(Input)
                 if Gui and Gui.Parent and Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
                     local DragDelta = Input.Position - DragStart
@@ -296,7 +294,7 @@ do
                 end
             end)
         
-            return self -- CORREÇÃO 3: Retorno ajustado para o objeto ao invés do booleano local estático
+            return self 
         end
 
         Instances.MakeResizeable = function(self, Minimum, Maximum)
@@ -418,7 +416,6 @@ do
             local success, fontObj = pcall(function()
                 if writefile and readfile and isfile and getcustomasset then
                     if not isfile(Data.Id) then 
-                        -- CHECKLIST: HttpGet robusto com timeout habilitado
                         local httpSuccess, response = pcall(function()
                             return game:HttpGet(Data.Url, true)
                         end)
@@ -460,7 +457,6 @@ do
     function Library:CreateInfoPopup(Title, Description, BadgeType)
         local BadgeColor = Library.BadgeColors[BadgeType] or Library.Theme.Accent
         
-        -- CORREÇÃO 4: Margem de Z-Index aumentada (+20) para evitar sobreposição visual
         Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 20
         local baseZIndex = Library.CurrentPopupZIndex
 
@@ -626,7 +622,6 @@ do
         end
         local textBoundsConnection = Parent:GetPropertyChangedSignal("TextBounds"):Connect(updatePos)
         
-        -- CORREÇÃO 8: Desconexão explícita do TextBounds para evitar vazamentos acumulativos
         Library:Connect(Parent.Destroying, function()
             if textBoundsConnection then
                 textBoundsConnection:Disconnect()
@@ -773,10 +768,10 @@ do
     end
 
     Library.Unload = function(self)
-        for _, Value in ipairs(self.Connections) do 
+        for _, Value in pairs(self.Connections) do 
             if Value.Connection then Value.Connection:Disconnect() end
         end
-        for _, Value in ipairs(self.Threads) do 
+        for _, Value in pairs(self.Threads) do 
             coroutine.close(Value)
         end
         if self.Holder then 
@@ -810,7 +805,6 @@ do
     end
     
     Library.SafeCall = function(self, Function, ...)
-        -- CHECKLIST: Verificação explícita de tipagem de função
         if typeof(Function) == "function" then
             local Success, Result = pcall(Function, ...)
             if not Success then
@@ -1876,7 +1870,6 @@ do
 
         function Keybind:Set(Key)
             if StringFind(tostring(Key), "Enum") then 
-                -- CORREÇÃO 6: Tratamento e aviso de conflito de teclas com o atalho mestre
                 local parsedKey = parseKey(tostring(Key))
                 if parsedKey == Library.ToggleKey then
                     warn("⚠️ Conflito de tecla detectado com o atalho principal da GUI!")
@@ -2053,7 +2046,7 @@ do
                     FontFace = Library.Font,
                     TextColor3 = Library.Theme["Text"],
                     BorderColor3 = FromRGB(0, 0, 0),
-                    Text = Name or "Watermark", -- CORREÇÃO 1: Hardcoded text resolvido usando o parâmetro dinâmico
+                    Text = Name or "Watermark", 
                     AnchorPoint = Vector2New(0, 0.5),
                     Size = UDim2New(0, 0, 0, 15),
                     BackgroundTransparency = 1,
@@ -2105,7 +2098,7 @@ do
                     Element = Element,
                     Type = Type,
                     Name = Name,
-                    SearchName = StringLower(Name or ""), -- MELHORIA 11: Cache do nome em lowercase para otimizar pesquisas
+                    SearchName = StringLower(Name or ""), 
                     Section = Section,
                     Page = Page
                 })
@@ -2182,7 +2175,6 @@ do
 
                 local anonConfigPath = "midnight_lib/anonymous_config.json"
                 if isfile and readfile and isfile(anonConfigPath) then
-                    -- CORREÇÃO 9: Tratamento pcall explícito contra leituras corrompidas de JSON
                     local success, decoded = pcall(function()
                         return HttpService:JSONDecode(readfile(anonConfigPath))
                     end)
@@ -2410,7 +2402,7 @@ do
                     end)
 
                     function SearchPopup:Open()
-                        Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 20 -- Incrementado
+                        Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 20 
                         local baseZ = Library.CurrentPopupZIndex
 
                         SearchPopup.Overlay.Instance.ZIndex = baseZ
@@ -2455,7 +2447,6 @@ do
                             TableInsert(queryWords, word)
                         end
 
-                        -- MELHORIA 11: Varredura de busca de alta performance usando o hash cache precalculado em minúsculo
                         for _, data in ipairs(Window.SearchableElements) do
                             local matches = false
                             local searchName = data.SearchName or ""
@@ -2618,7 +2609,6 @@ do
             end
 
             function Window:AddConfigPage()
-                -- CORREÇÃO 5: Prevenção de fechamento/re-geração nula
                 if not self or not self.Items then return end
 
                 local ConfigPage = self:AddPage({Name = "Config", Icon = "rbxassetid://11419114175"})
@@ -2800,12 +2790,13 @@ do
                     end
                 })
 
-                -- SEÇÃO: COMPARTILHAMENTO E EXPLICAÇÃO
+                -- SEÇÃO: COMPARTILHAMENTO E EXPLICAÇÃO REFORMULADA
                 local CopySec = ConfigPage:AddSection({Name = "Share Config"})
                 
+                -- REFORMULADO: Parágrafo com tópicos limpos e organizados (Melhoria Visual)
                 CopySec:AddParagraph({
-                    Title = "Como utilizar o sistema",
-                    Content = "Use o gerenciador acima para criar e salvar os perfis localmente.\n\nSe deseja compartilhar seus ajustes com amigos ou usá-los em outro dispositivo, clique no botão de cópia abaixo para salvar todo o código de configurações atual diretamente em sua área de transferência para colagem rápida.",
+                    Title = "Exportar Configurações",
+                    Content = "• Salve seus perfis de forma persistente utilizando o gerenciador acima.\n\n• Use o botão de cópia abaixo para enviar a string JSON atualizada diretamente para sua área de transferência.\n\n• Compartilhe com amigos ou salve em arquivos externos para backup.",
                     Icon = "rbxassetid://11419114175"
                 })
 
@@ -2959,7 +2950,6 @@ do
                 if Window and Window.AddConfigPage then
                     Window:AddConfigPage()
                     
-                    -- Processamento do Autoload seguro
                     if isfile and readfile and isfile("midnight_lib/autoload.json") then
                         local success, decoded = pcall(function()
                             return HttpService:JSONDecode(readfile("midnight_lib/autoload.json"))
@@ -2983,7 +2973,6 @@ do
                         end
                     end
 
-                    -- Processamento do Auto-Execute no Launch seguro
                     local aePath = "midnight_lib/auto_execute.json"
                     if isfile and readfile and isfile(aePath) then
                         local success, decoded = pcall(function()
@@ -3024,7 +3013,6 @@ do
                 end
             end)
 
-            -- Ouvinte global de Inputs para ocultar/exibir UI via tecla dinâmica
             Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
                 if GameProcessed then return end
                 
@@ -3151,7 +3139,6 @@ do
                 end
             end
 
-            -- SISTEMA DE SUB-ABAS (SUB-TABS)
             function Page:AddSubTab(SubTabData)
                 SubTabData = SubTabData or {}
                 local SubTab = {
@@ -3160,7 +3147,6 @@ do
                     Active = false
                 }
                 
-                -- CORREÇÃO 10: Limite de Sub-Abas adicionado com aviso preventivo
                 local MAX_SUBTABS = 10
                 if #self.SubTabs >= MAX_SUBTABS then
                     warn("⚠️ Limite de sub-abas atingido (" .. MAX_SUBTABS .. ")!")
@@ -3539,7 +3525,6 @@ do
                 
                 local function Set(Key)
                     if StringFind(tostring(Key), "Enum") then
-                        -- CORREÇÃO 6: Validação de conflito de teclas para binds agregadas ao toggle
                         local parsedKey = parseKey(tostring(Key))
                         if parsedKey == Library.ToggleKey then
                             warn("⚠️ Conflito de tecla detectado com o atalho principal da GUI!")
@@ -3965,7 +3950,6 @@ do
                     if type(val) == "table" then
                         Dropdown.Value = val
                     else
-                        -- CORREÇÃO 7: Validador de limite para seleção múltipla para prevenir quebra de layout
                         local selectedCount = 0
                         for _, active in pairs(Dropdown.Value) do
                             if active then selectedCount = selectedCount + 1 end
@@ -4247,7 +4231,7 @@ do
             return Input
         end
 
-        -- PARÁGRAFO (PARAGRAPH)
+        -- PARÁGRAFO (PARAGRAPH) - REDESENHADO / CORRIGIDO VISUALMENTE
         Library.Sections.Paragraph = function(self, Data)
             Data = Data or {}
             local Paragraph = {
@@ -4266,21 +4250,38 @@ do
                 Instances:Create("UICorner", { Parent = Items["Main"].Instance, CornerRadius = UDimNew(0, 6) })
                 Instances:Create("UIStroke", { Parent = Items["Main"].Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
 
+                -- Accent Line (Strip) - Posicionada de forma absoluta na borda esquerda, sem quebrar o fluxo da UIListLayout
                 Items["Strip"] = Instances:Create("Frame", {
                     Parent = Items["Main"].Instance,
                     Size = UDim2New(0, 4, 1, 0),
+                    Position = UDim2New(0, 0, 0, 0),
                     BackgroundColor3 = Library.Theme.Accent,
-                    BorderSizePixel = 0
+                    BorderSizePixel = 0,
+                    ZIndex = 2
                 }):AddToTheme({BackgroundColor3 = 'Accent'})
-                Instances:Create("UICorner", { Parent = Items["Strip"].Instance, CornerRadius = UDimNew(0, 4) })
+                
+                -- Arredonda apenas os cantos esquerdos da faixa de cor para encaixar perfeitamente no frame principal
+                local stripCorner = Instances:Create("UICorner", { 
+                    Parent = Items["Strip"].Instance, 
+                    CornerRadius = UDimNew(0, 6) 
+                })
+
+                -- Container de Texto - Isola o fluxo vertical de layout dos elementos visuais absolutos
+                local Container = Instances:Create("Frame", {
+                    Parent = Items["Main"].Instance,
+                    Size = UDim2New(1, -4, 0, 0),
+                    Position = UDim2New(0, 4, 0, 0),
+                    BackgroundTransparency = 1,
+                    AutomaticSize = Enum.AutomaticSize.Y
+                })
 
                 local list = Instances:Create("UIListLayout", {
-                    Parent = Items["Main"].Instance,
+                    Parent = Container.Instance,
                     Padding = UDimNew(0, 4)
                 })
 
                 local padding = Instances:Create("UIPadding", {
-                    Parent = Items["Main"].Instance,
+                    Parent = Container.Instance,
                     PaddingLeft = UDimNew(0, 14),
                     PaddingRight = UDimNew(0, 10),
                     PaddingTop = UDimNew(0, 8),
@@ -4288,7 +4289,7 @@ do
                 })
 
                 local HeaderFrame = Instances:Create("Frame", {
-                    Parent = Items["Main"].Instance,
+                    Parent = Container.Instance,
                     Size = UDim2New(1, 0, 0, 20),
                     BackgroundTransparency = 1
                 })
@@ -4322,7 +4323,7 @@ do
                 }):AddToTheme({TextColor3 = 'Accent'})
 
                 Items["ContentLabel"] = Instances:Create("TextLabel", {
-                    Parent = Items["Main"].Instance,
+                    Parent = Container.Instance,
                     FontFace = Library.Font,
                     TextColor3 = Library.Theme.Text,
                     Text = Paragraph.Content,
