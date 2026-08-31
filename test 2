@@ -87,7 +87,7 @@ do
         Theme = {},
         MenuKeybind = tostring(Enum.KeyCode.RightControl), 
         ToggleKey = Enum.KeyCode.RightControl,
-        AutoExecuteScript = "", -- Propriedade a ser definida pelo desenvolvedor no loader
+        AutoExecuteScript = "", -- Propriedade definida estritamente pelo desenvolvedor no loader
         Flags = {},
         IsInteracting = false,
         Tween = {
@@ -2592,23 +2592,6 @@ do
                 Window.Items = Items
             end
 
-            function Window:SetOpen(Bool)
-                Window.IsOpen = Bool 
-                if Bool then
-                    Items["MainFrame"].Instance.Visible = true
-                    Window.ScaleObj.Scale = 0
-                    TweenService:Create(Window.ScaleObj, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-                else
-                    local t = TweenService:Create(Window.ScaleObj, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0})
-                    t:Play()
-                    t.Completed:Connect(function()
-                        if not Window.IsOpen then
-                            Items["MainFrame"].Instance.Visible = false
-                        end
-                    end)
-                end
-            end
-
             function Window:AddConfigPage()
                 if not self or not self.Items then return end
 
@@ -2791,7 +2774,6 @@ do
                     end
                 })
 
-                -- SEÇÃO: COMPARTILHAMENTO E EXPLICAÇÃO REFORMULADA
                 local CopySec = ConfigPage:AddSection({Name = "Share Config"})
                 
                 CopySec:AddParagraph({
@@ -2800,7 +2782,6 @@ do
                     Icon = "rbxassetid://11419114175"
                 })
 
-                -- MODIFICAÇÃO: Botão de Cópia inteligente de configuração
                 CopySec:AddButton({
                     Name = "Copy Selected/Active Config",
                     Callback = function()
@@ -2811,13 +2792,11 @@ do
 
                         local configToCopy = ""
                         if SelectedConfig ~= "None" and SelectedConfig ~= "" then
-                            -- Se houver arquivo selecionado no dropdown, copia o conteúdo do arquivo
                             local path = Library.Folders.Configs .. "/" .. SelectedConfig .. ".json"
                             if isfile(path) then
                                 configToCopy = readfile(path)
                             end
                         else
-                            -- Caso contrário, copia o estado ativo atual da UI
                             configToCopy = Library:GetConfig()
                         end
 
@@ -2834,7 +2813,6 @@ do
                     end
                 })
 
-                -- MODIFICAÇÃO: Botão de Importação Direta do Clipboard
                 CopySec:AddButton({
                     Name = "Load Config from Clipboard",
                     Callback = function()
@@ -2857,9 +2835,16 @@ do
                     end
                 })
 
-                -- SEÇÃO: AUTO-EXECUTE (TELEPORT RE-RUN) REFORMULADO
+                -- SEÇÃO: AUTO-EXECUTE (TELEPORT RE-RUN) 100% REFORMULADO
+                -- CORREÇÃO: Sem campos de entrada visíveis para o usuário comum. Apenas Parágrafo explicativo + Toggle de controle de teleport.
                 local AutoExecSec = ConfigPage:AddSection({Name = "Auto Re-Execute"})
                 
+                AutoExecSec:AddParagraph({
+                    Title = "Re-execução de Script em Teleporte",
+                    Content = "• Ao ativar esta opção, o sistema enfileirará automaticamente o carregamento do script em teletransportes ou Server Hops.\n\n• O código executado é predefinido de forma invisível e segura no código fonte do desenvolvedor.",
+                    Icon = "rbxassetid://11419114175"
+                })
+
                 local autoTeleportPath = "midnight_lib/auto_teleport.json"
                 local autoTeleportData = {Enabled = false}
                 if isfile and readfile and isfile(autoTeleportPath) then
@@ -2871,7 +2856,6 @@ do
                     end
                 end
 
-                -- MODIFICAÇÃO: Apenas Toggle de ativação para usar o queue_on_teleport nativo
                 AutoExecSec:AddToggle({
                     Name = "Auto Re-Execute on Teleport",
                     Default = autoTeleportData.Enabled,
@@ -2882,8 +2866,8 @@ do
                         end
                         if state then
                             Library:Notify({
-                                Title = "Ativado",
-                                Content = "O script será automaticamente enfileirado para re-execução após se teletransportar.",
+                                Title = "Re-Execute Ativo",
+                                Content = "O menu será recarregado automaticamente após trocar de servidor.",
                                 Duration = 4,
                                 Type = "SAFE"
                             })
@@ -2984,7 +2968,7 @@ do
                 end
             end)
 
-            -- MODIFICAÇÃO: Conexão unificada e inteligente para monitorar e registrar o Teleport Re-Execute
+            -- Ouvinte e registro inteligente de queue_on_teleport (Auto Re-Execute)
             local teleportConnection
             local function setupTeleportListener()
                 if teleportConnection then return end
@@ -3143,6 +3127,7 @@ do
                 end
             end
 
+            -- SISTEMA DE SUB-ABAS (SUB-TABS)
             function Page:AddSubTab(SubTabData)
                 SubTabData = SubTabData or {}
                 local SubTab = {
@@ -3555,7 +3540,7 @@ do
                     KeyButton.Instance.Text = "[...]"
                     local Connection
                     Connection = UserInputService.InputBegan:Connect(function(Input)
-                        if Input.KeyCode == Enum.KeyCode.Escape or Input.KeyCode == Enum.KeyCode.Backspace then
+                        if Input.KeyCode == Enum.KeyCode.Escape or Input.KeyCode == Enum.Backspace then
                             Keybind.Key = "None"
                             Keybind.Value = "None"
                             KeyButton.Instance.Text = "[None]"
@@ -4473,4 +4458,3 @@ do
 end
 
 return Library
-
