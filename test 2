@@ -2134,7 +2134,16 @@ do
             Size = UDim2New(0, 16, 0, 160), Text = "", AutoButtonColor = false, Active = true,
             BackgroundColor3 = FromRGB(255, 0, 0), BorderSizePixel = 0
         })
-        Instances:Create("UIGradient", {Parent = Items.Hue.Instance, Rotation = 90, Color = HueSequence})
+        for index = 0, 35 do
+            local segment = Instances:Create("Frame", {
+                Parent = Items.Hue.Instance,
+                Size = UDim2New(1, 0, 0, 160 / 36),
+                Position = UDim2New(0, 0, 0, index * (160 / 36)),
+                BackgroundColor3 = FromHSV(index / 35, 1, 1),
+                BorderSizePixel = 0
+            })
+            segment.Instance.Active = false
+        end
         Items.HueDragger = Instances:Create("Frame", {
             Parent = Items.Hue.Instance, Size = UDim2New(1, 4, 0, 4), Position = UDim2New(0, -2, 0, 0),
             AnchorPoint = Vector2New(0, 0.5), BackgroundTransparency = 1, ZIndex = 5
