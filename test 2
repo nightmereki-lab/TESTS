@@ -1,5 +1,3 @@
-
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -2115,6 +2113,11 @@ do
                     BorderSizePixel = 0,
                     BackgroundColor3 = Library.Theme["Background"]
                 }):AddToTheme({BackgroundColor3 = 'Background'})
+
+                function Window:SetOpen(Bool)
+                    self.IsOpen = Bool == true
+                    Items["MainFrame"].Instance.Visible = self.IsOpen
+                end
 
                 Items["MainFrame"]:MakeDraggable()
                 Items["MainFrame"]:MakeResizeable(Vector2New(673, 511), Vector2New(9999, 9999))
