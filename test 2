@@ -1005,7 +1005,7 @@ do
     end
 
     -- COLORPICKER
-    Library.CreateColorpicker = function(self, Data)
+    local LegacyCreateColorpicker = function(self, Data)
         local Colorpicker = {
             Flag = Data.Flag, 
             Hue = 0,
@@ -1635,6 +1635,403 @@ do
         end
 
         return Colorpicker, Items 
+    end
+
+    Library.CreateColorpicker = function(self, Data)
+        Data = Data or {}
+
+        local Colorpicker = {
+            Flag = Data.Flag,
+            Hue = 0,
+            Saturation = 0,
+            Value = 0,
+            Alpha = 1,
+            Color = FromRGB(0, 0, 0),
+            HexValue = "000000",
+            IsOpen = false,
+            SlidingPalette = false,
+            SlidingHue = false,
+            SlidingAlpha = false
+        }
+
+        local ParseHex = function(value)
+            value = tostring(value or ""):gsub("#", ""):gsub("%s+", "")
+            if #value ~= 6 then return nil end
+            local red = tonumber(value:sub(1, 2), 16)
+            local green = tonumber(value:sub(3, 4), 16)
+            local blue = tonumber(value:sub(5, 6), 16)
+            if not red or not green or not blue then return nil end
+            return FromRGB(red, green, blue)
+        end
+
+        local ParseRGB = function(value)
+            local red, green, blue = tostring(value or ""):match("^%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*$")
+            red, green, blue = tonumber(red), tonumber(green), tonumber(blue)
+            if not red or not green or not blue then return nil end
+            if red > 255 or green > 255 or blue > 255 then return nil end
+            return FromRGB(red, green, blue)
+        end
+
+        local Items = {}
+        Items.ColorpickerButton = Instances:Create("TextButton", {
+            Parent = Data.Parent.Instance,
+            Name = "\0",
+            Text = "",
+            Active = true,
+            AutoButtonColor = false,
+            Size = UDim2New(0, 20, 0, 16),
+            BorderSizePixel = 0,
+            BackgroundColor3 = FromRGB(0, 0, 0)
+        })
+        Instances:Create("UICorner", {Parent = Items.ColorpickerButton.Instance, CornerRadius = UDimNew(0, 6)})
+        Instances:Create("UIStroke", {
+            Parent = Items.ColorpickerButton.Instance,
+            Color = Library.Theme.Outline,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        }):AddToTheme({Color = "Outline"})
+
+        Items.Glow = Instances:Create("ImageLabel", {
+            Parent = Items.ColorpickerButton.Instance,
+            Image = "http://www.roblox.com/asset/?id=18245826428",
+            ImageColor3 = FromRGB(0, 0, 0),
+            ImageTransparency = 0.8,
+            BackgroundTransparency = 1,
+            Size = UDim2New(1, 25, 1, 25),
+            Position = UDim2New(0.5, 0, 0.5, 0),
+            AnchorPoint = Vector2New(0.5, 0.5),
+            ZIndex = 2,
+            ScaleType = Enum.ScaleType.Slice,
+            SliceCenter = RectNew(Vector2New(21, 21), Vector2New(79, 79))
+        })
+
+        Items.ColorpickerWindow = Instances:Create("TextButton", {
+            Parent = Library.UnusedHolder.Instance,
+            Text = "",
+            Active = true,
+            AutoButtonColor = false,
+            Size = UDim2New(0, 220, 0, 215),
+            BorderSizePixel = 0,
+            BackgroundColor3 = Library.Theme.Background
+        }):AddToTheme({BackgroundColor3 = "Background"})
+        Instances:Create("UICorner", {Parent = Items.ColorpickerWindow.Instance, CornerRadius = UDimNew(0, 6)})
+
+        Items.Palette = Instances:Create("TextButton", {
+            Parent = Items.ColorpickerWindow.Instance,
+            Text = "",
+            Active = true,
+            AutoButtonColor = false,
+            Position = UDim2New(0, 8, 0, 8),
+            Size = UDim2New(0, 140, 0, 130),
+            BorderSizePixel = 0,
+            BackgroundColor3 = FromRGB(255, 0, 0)
+        })
+        Instances:Create("UICorner", {Parent = Items.Palette.Instance, CornerRadius = UDimNew(0, 5)})
+
+        Items.Saturation = Instances:Create("Frame", {
+            Parent = Items.Palette.Instance,
+            Size = UDim2New(1, 0, 1, 0),
+            BorderSizePixel = 0,
+            BackgroundColor3 = FromRGB(255, 255, 255)
+        })
+        Instances:Create("UIGradient", {
+            Parent = Items.Saturation.Instance,
+            Transparency = NumSequence{NumSequenceKeypoint(0, 1), NumSequenceKeypoint(1, 0)}
+        })
+
+        Items.Value = Instances:Create("Frame", {
+            Parent = Items.Palette.Instance,
+            Size = UDim2New(1, 0, 1, 0),
+            BorderSizePixel = 0,
+            BackgroundColor3 = FromRGB(0, 0, 0)
+        })
+        Instances:Create("UIGradient", {
+            Parent = Items.Value.Instance,
+            Rotation = 90,
+            Transparency = NumSequence{NumSequenceKeypoint(0, 1), NumSequenceKeypoint(1, 0)}
+        })
+        Instances:Create("UICorner", {Parent = Items.Saturation.Instance, CornerRadius = UDimNew(0, 5)})
+        Instances:Create("UICorner", {Parent = Items.Value.Instance, CornerRadius = UDimNew(0, 5)})
+
+        Items.PaletteDragger = Instances:Create("Frame", {
+            Parent = Items.Palette.Instance,
+            Size = UDim2New(0, 8, 0, 8),
+            AnchorPoint = Vector2New(0.5, 0.5),
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            ZIndex = 5
+        })
+        Instances:Create("UIStroke", {Parent = Items.PaletteDragger.Instance, Color = FromRGB(255, 255, 255), Thickness = 1.5})
+        Instances:Create("UICorner", {Parent = Items.PaletteDragger.Instance, CornerRadius = UDimNew(1, 0)})
+
+        Items.Hue = Instances:Create("TextButton", {
+            Parent = Items.ColorpickerWindow.Instance,
+            Text = "",
+            Active = true,
+            AutoButtonColor = false,
+            Position = UDim2New(0, 156, 0, 8),
+            Size = UDim2New(0, 15, 0, 130),
+            BorderSizePixel = 0
+        })
+        Instances:Create("UIGradient", {
+            Parent = Items.Hue.Instance,
+            Rotation = 90,
+            Color = RGBSequence{
+                RGBSequenceKeypoint(0, FromRGB(255, 0, 0)),
+                RGBSequenceKeypoint(0.17, FromRGB(255, 255, 0)),
+                RGBSequenceKeypoint(0.33, FromRGB(0, 255, 0)),
+                RGBSequenceKeypoint(0.5, FromRGB(0, 255, 255)),
+                RGBSequenceKeypoint(0.67, FromRGB(0, 0, 255)),
+                RGBSequenceKeypoint(0.83, FromRGB(255, 0, 255)),
+                RGBSequenceKeypoint(1, FromRGB(255, 0, 0))
+            }
+        })
+        Instances:Create("UICorner", {Parent = Items.Hue.Instance, CornerRadius = UDimNew(0, 6)})
+        Items.HueDragger = Instances:Create("Frame", {
+            Parent = Items.Hue.Instance,
+            Size = UDim2New(1, 4, 0, 4),
+            Position = UDim2New(0, -2, 0, 0),
+            AnchorPoint = Vector2New(0, 0.5),
+            BackgroundTransparency = 1,
+            ZIndex = 5
+        })
+        Instances:Create("UIStroke", {Parent = Items.HueDragger.Instance, Color = FromRGB(255, 255, 255), Thickness = 1.5})
+
+        Items.Alpha = Instances:Create("TextButton", {
+            Parent = Items.ColorpickerWindow.Instance,
+            Text = "",
+            Active = true,
+            AutoButtonColor = false,
+            Position = UDim2New(0, 179, 0, 8),
+            Size = UDim2New(0, 15, 0, 130),
+            BorderSizePixel = 0,
+            BackgroundColor3 = FromRGB(255, 255, 255)
+        })
+        Items.AlphaGradient = Instances:Create("UIGradient", {
+            Parent = Items.Alpha.Instance,
+            Rotation = 90,
+            Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(20, 20, 20))},
+            Transparency = NumSequence{NumSequenceKeypoint(0, 0), NumSequenceKeypoint(1, 1)}
+        })
+        Instances:Create("UICorner", {Parent = Items.Alpha.Instance, CornerRadius = UDimNew(0, 6)})
+        Items.AlphaDragger = Instances:Create("Frame", {
+            Parent = Items.Alpha.Instance,
+            Size = UDim2New(1, 4, 0, 4),
+            Position = UDim2New(0, -2, 0, 0),
+            AnchorPoint = Vector2New(0, 0.5),
+            BackgroundTransparency = 1,
+            ZIndex = 5
+        })
+        Instances:Create("UIStroke", {Parent = Items.AlphaDragger.Instance, Color = FromRGB(255, 255, 255), Thickness = 1.5})
+
+        Items.InputsContainer = Instances:Create("Frame", {
+            Parent = Items.ColorpickerWindow.Instance,
+            Position = UDim2New(0, 8, 0, 146),
+            Size = UDim2New(0, 204, 0, 60),
+            BackgroundTransparency = 1
+        })
+        Items.HexInput = Instances:Create("TextBox", {
+            Parent = Items.InputsContainer.Instance,
+            Size = UDim2New(0, 75, 0, 24),
+            Position = UDim2New(0, 0, 0, 4),
+            BackgroundColor3 = Library.Theme.Inline,
+            Text = "#000000",
+            PlaceholderText = "#HEX",
+            TextColor3 = Library.Theme.Text,
+            FontFace = Library.Font,
+            TextSize = 12,
+            ClearTextOnFocus = false
+        }):AddToTheme({BackgroundColor3 = "Inline", TextColor3 = "Text"})
+        Instances:Create("UICorner", {Parent = Items.HexInput.Instance, CornerRadius = UDimNew(0, 5)})
+        Items.RGBInput = Instances:Create("TextBox", {
+            Parent = Items.InputsContainer.Instance,
+            Size = UDim2New(0, 95, 0, 24),
+            Position = UDim2New(0, 80, 0, 4),
+            BackgroundColor3 = Library.Theme.Inline,
+            Text = "0,0,0",
+            PlaceholderText = "R, G, B",
+            TextColor3 = Library.Theme.Text,
+            FontFace = Library.Font,
+            TextSize = 11,
+            ClearTextOnFocus = false
+        }):AddToTheme({BackgroundColor3 = "Inline", TextColor3 = "Text"})
+        Instances:Create("UICorner", {Parent = Items.RGBInput.Instance, CornerRadius = UDimNew(0, 5)})
+        Items.CopyBtn = Instances:Create("TextButton", {
+            Parent = Items.InputsContainer.Instance,
+            Size = UDim2New(0, 24, 0, 24),
+            Position = UDim2New(0, 180, 0, 4),
+            BackgroundColor3 = Library.Theme.Element,
+            Text = "C",
+            TextColor3 = Library.Theme.Text,
+            FontFace = Library.Font,
+            TextSize = 12,
+            AutoButtonColor = false,
+            Active = true
+        }):AddToTheme({BackgroundColor3 = "Element", TextColor3 = "Text"})
+        Instances:Create("UICorner", {Parent = Items.CopyBtn.Instance, CornerRadius = UDimNew(0, 5)})
+
+        local function PositionToValue(input)
+            local palette = Items.Palette.Instance
+            local x = MathClamp((input.Position.X - palette.AbsolutePosition.X) / math.max(palette.AbsoluteSize.X, 1), 0, 1)
+            local y = MathClamp((input.Position.Y - palette.AbsolutePosition.Y) / math.max(palette.AbsoluteSize.Y, 1), 0, 1)
+            return x, 1 - y
+        end
+
+        local function PositionToHue(input)
+            local hue = Items.Hue.Instance
+            return MathClamp((input.Position.Y - hue.AbsolutePosition.Y) / math.max(hue.AbsoluteSize.Y, 1), 0, 1)
+        end
+
+        local function PositionToAlpha(input)
+            local alpha = Items.Alpha.Instance
+            local y = MathClamp((input.Position.Y - alpha.AbsolutePosition.Y) / math.max(alpha.AbsoluteSize.Y, 1), 0, 1)
+            return 1 - y
+        end
+
+        local UpdatingInputs = false
+        local function UpdateInputText()
+            if UpdatingInputs then return end
+            UpdatingInputs = true
+            Items.HexInput.Instance.Text = "#" .. Colorpicker.HexValue:upper()
+            Items.RGBInput.Instance.Text = StringFormat("%d,%d,%d", MathFloor(Colorpicker.Color.R * 255 + 0.5), MathFloor(Colorpicker.Color.G * 255 + 0.5), MathFloor(Colorpicker.Color.B * 255 + 0.5))
+            UpdatingInputs = false
+        end
+
+        local function UpdateColor(notify)
+            Colorpicker.Hue = MathClamp(Colorpicker.Hue, 0, 1)
+            Colorpicker.Saturation = MathClamp(Colorpicker.Saturation, 0, 1)
+            Colorpicker.Value = MathClamp(Colorpicker.Value, 0, 1)
+            Colorpicker.Alpha = MathClamp(Colorpicker.Alpha, 0, 1)
+            Colorpicker.Color = FromHSV(Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value)
+            Colorpicker.HexValue = Colorpicker.Color:ToHex()
+
+            Items.ColorpickerButton.Instance.BackgroundColor3 = Colorpicker.Color
+            Items.ColorpickerButton.Instance.BackgroundTransparency = 1 - Colorpicker.Alpha
+            Items.Glow.Instance.ImageColor3 = Colorpicker.Color
+            Items.Glow.Instance.ImageTransparency = MathClamp(1 - Colorpicker.Alpha + 0.2, 0, 1)
+            Items.Palette.Instance.BackgroundColor3 = FromHSV(Colorpicker.Hue, 1, 1)
+            Items.AlphaGradient.Instance.Color = RGBSequence{
+                RGBSequenceKeypoint(0, Colorpicker.Color),
+                RGBSequenceKeypoint(1, FromRGB(20, 20, 20))
+            }
+
+            Items.PaletteDragger.Instance.Position = UDim2New(Colorpicker.Saturation, 0, 1 - Colorpicker.Value, 0)
+            Items.HueDragger.Instance.Position = UDim2New(0, 0, Colorpicker.Hue, 0)
+            Items.AlphaDragger.Instance.Position = UDim2New(0, 0, 1 - Colorpicker.Alpha, 0)
+            UpdateInputText()
+
+            Library.Flags[Colorpicker.Flag] = {
+                Color = Colorpicker.Color,
+                Alpha = Colorpicker.Alpha,
+                HexValue = Colorpicker.HexValue
+            }
+            if notify and Data.Callback then
+                Library:SafeCall(Data.Callback, Colorpicker.Color, Colorpicker.Alpha)
+            end
+        end
+
+        function Colorpicker:Get()
+            return Colorpicker.Color, Colorpicker.Alpha
+        end
+
+        function Colorpicker:Set(color, alpha)
+            if type(color) == "table" then
+                alpha = color.Alpha ~= nil and color.Alpha or alpha
+                color = color.Color or color
+                if type(color) == "table" then color = FromRGB(color[1], color[2], color[3]) end
+            end
+            if type(color) == "string" then
+                color = ParseHex(color)
+            end
+            color = typeof(color) == "Color3" and color or FromRGB(255, 255, 255)
+            Colorpicker.Hue, Colorpicker.Saturation, Colorpicker.Value = color:ToHSV()
+            if alpha ~= nil then Colorpicker.Alpha = MathClamp(alpha, 0, 1) end
+            UpdateColor(true)
+        end
+
+        local function BeginSlide(name, input)
+            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            Colorpicker[name] = true
+            Library.IsInteracting = true
+            if name == "SlidingPalette" then
+                Colorpicker.Saturation, Colorpicker.Value = PositionToValue(input)
+            elseif name == "SlidingHue" then
+                Colorpicker.Hue = PositionToHue(input)
+            else
+                Colorpicker.Alpha = PositionToAlpha(input)
+            end
+            UpdateColor(true)
+        end
+
+        Items.Palette:Connect("InputBegan", function(input) BeginSlide("SlidingPalette", input) end)
+        Items.Hue:Connect("InputBegan", function(input) BeginSlide("SlidingHue", input) end)
+        Items.Alpha:Connect("InputBegan", function(input) BeginSlide("SlidingAlpha", input) end)
+
+        Library:Connect(UserInputService.InputChanged, function(input)
+            if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            if Colorpicker.SlidingPalette then Colorpicker.Saturation, Colorpicker.Value = PositionToValue(input)
+            elseif Colorpicker.SlidingHue then Colorpicker.Hue = PositionToHue(input)
+            elseif Colorpicker.SlidingAlpha then Colorpicker.Alpha = PositionToAlpha(input)
+            else return end
+            UpdateColor(true)
+        end)
+        Library:Connect(UserInputService.InputEnded, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                Colorpicker.SlidingPalette = false
+                Colorpicker.SlidingHue = false
+                Colorpicker.SlidingAlpha = false
+                Library.IsInteracting = false
+            end
+        end)
+
+        Items.HexInput:Connect("FocusLost", function()
+            local color = ParseHex(Items.HexInput.Instance.Text)
+            if color then Colorpicker:Set(color, Colorpicker.Alpha) else UpdateInputText() end
+        end)
+        Items.RGBInput:Connect("FocusLost", function()
+            local color = ParseRGB(Items.RGBInput.Instance.Text)
+            if color then Colorpicker:Set(color, Colorpicker.Alpha) else UpdateInputText() end
+        end)
+        Items.CopyBtn:Connect("MouseButton1Click", function()
+            if setclipboard then pcall(setclipboard, "#" .. Colorpicker.HexValue:upper()) end
+        end)
+
+        local Open = false
+        function Colorpicker:SetOpen(value)
+            Open = value == true
+            Colorpicker.IsOpen = Open
+            Items.ColorpickerWindow.Instance.Visible = Open
+            Items.ColorpickerWindow.Instance.Parent = Open and Library.Holder.Instance or Library.UnusedHolder.Instance
+            if Open then
+                local button = Items.ColorpickerButton.Instance
+                local window = Items.ColorpickerWindow.Instance
+                local viewport = Camera.ViewportSize
+                local x = MathClamp(button.AbsolutePosition.X, 10, math.max(viewport.X - window.AbsoluteSize.X - 10, 10))
+                local y = button.AbsolutePosition.Y + button.AbsoluteSize.Y + 5
+                if y + window.AbsoluteSize.Y > viewport.Y then y = button.AbsolutePosition.Y - window.AbsoluteSize.Y - 5 end
+                window.Position = UDim2New(0, x, 0, MathMax(y, 10))
+                for other in pairs(Library.OpenFrames) do
+                    if other ~= Colorpicker and other.SetOpen then other:SetOpen(false) end
+                end
+                Library.OpenFrames[Colorpicker] = Colorpicker
+            else
+                Library.OpenFrames[Colorpicker] = nil
+            end
+        end
+        Items.ColorpickerButton:Connect("MouseButton1Click", function()
+            Colorpicker:SetOpen(not Colorpicker.IsOpen)
+        end)
+
+        Library:Connect(UserInputService.InputBegan, function(input)
+            if Colorpicker.IsOpen and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                if not Library:IsMouseOverFrame(Items.ColorpickerWindow) and not Library:IsMouseOverFrame(Items.ColorpickerButton) then
+                    Colorpicker:SetOpen(false)
+                end
+            end
+        end)
+
+        if Data.Default ~= nil then Colorpicker:Set(Data.Default, Data.Alpha) else UpdateColor(false) end
+        Library.SetFlags[Colorpicker.Flag] = function(value, alpha) Colorpicker:Set(value, alpha) end
+        return Colorpicker, Items
     end
 
     local Keys = Keys
