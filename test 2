@@ -2094,10 +2094,28 @@ do
         Items.Palette = Instances:Create("ImageButton", {
             Parent = Items.ColorpickerWindow.Instance, Position = UDim2New(0, 8, 0, 8),
             Size = UDim2New(0, 160, 0, 160), BorderSizePixel = 0, AutoButtonColor = false,
-            BackgroundColor3 = Colorpicker.Value, Image = "rbxassetid://4155801252",
+            BackgroundColor3 = Colorpicker.Value, ImageTransparency = 1,
             ScaleType = Enum.ScaleType.Stretch, Active = true
         })
         Instances:Create("UICorner", {Parent = Items.Palette.Instance, CornerRadius = UDimNew(0, 5)})
+        Items.SaturationOverlay = Instances:Create("Frame", {
+            Parent = Items.Palette.Instance, Size = UDim2New(1, 0, 1, 0),
+            BackgroundColor3 = FromRGB(255, 255, 255), BorderSizePixel = 0,
+            BackgroundTransparency = 0
+        })
+        Instances:Create("UIGradient", {
+            Parent = Items.SaturationOverlay.Instance,
+            Transparency = NumSequence{NumSequenceKeypoint(0, 0), NumSequenceKeypoint(1, 1)}
+        })
+        Items.ValueOverlay = Instances:Create("Frame", {
+            Parent = Items.Palette.Instance, Size = UDim2New(1, 0, 1, 0),
+            BackgroundColor3 = FromRGB(0, 0, 0), BorderSizePixel = 0,
+            BackgroundTransparency = 0
+        })
+        Instances:Create("UIGradient", {
+            Parent = Items.ValueOverlay.Instance, Rotation = 90,
+            Transparency = NumSequence{NumSequenceKeypoint(0, 1), NumSequenceKeypoint(1, 0)}
+        })
         Items.PaletteDragger = Instances:Create("Frame", {
             Parent = Items.Palette.Instance, Size = UDim2New(0, 8, 0, 8), AnchorPoint = Vector2New(0.5, 0.5),
             BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 5
