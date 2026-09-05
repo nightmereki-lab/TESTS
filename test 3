@@ -2134,11 +2134,18 @@ do
             Size = UDim2New(0, 16, 0, 160), Text = "", AutoButtonColor = false, Active = true,
             BackgroundColor3 = FromRGB(255, 0, 0), BorderSizePixel = 0
         })
-        Instances:Create("UIGradient", {
-            Parent = Items.Hue.Instance,
-            Rotation = 90,
-            Color = HueSequence
-        })
+        Items.Hue.Instance.ClipsDescendants = true
+        for index = 0, 59 do
+            local segment = Instances:Create("Frame", {
+                Parent = Items.Hue.Instance,
+                Position = UDim2New(0, 0, index / 60, 0),
+                Size = UDim2New(1, 0, 1 / 60 + 0.002, 0),
+                BackgroundColor3 = FromHSV(index / 59, 1, 1),
+                BorderSizePixel = 0,
+                Active = false
+            })
+            segment.Instance.ZIndex = 1
+        end
         Instances:Create("UICorner", {
             Parent = Items.Hue.Instance,
             CornerRadius = UDimNew(0, 6)
