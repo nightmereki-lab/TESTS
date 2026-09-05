@@ -1388,7 +1388,7 @@ do
             Colorpicker.Alpha = MathClamp(Alpha, 0, 1)
 
             local PaletteValueX = MathClamp(Colorpicker.Saturation, 0, 1)
-            local PaletteValueY = MathClamp(1 - Colorpicker.Value, 0, 1)
+            local PaletteValueY = MathClamp(Colorpicker.Value, 0, 1)
 
             Items["PaletteDragger"].Instance.Position = UDim2New(PaletteValueX, 0, PaletteValueY, 0)
             Items["HueDragger"].Instance.Position = UDim2New(0, 0, Colorpicker.Hue, 0)
@@ -1401,12 +1401,12 @@ do
             if not Input or not Colorpicker.SlidingPalette then return end
 
             local ValueX = MathClamp((Input.Position.X - Items["Palette"].Instance.AbsolutePosition.X) / Items["Palette"].Instance.AbsoluteSize.X, 0, 1)
-            local ValueY = MathClamp(1 - (Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 1)
+            local ValueY = MathClamp((Input.Position.Y - Items["Palette"].Instance.AbsolutePosition.Y) / Items["Palette"].Instance.AbsoluteSize.Y, 0, 1)
 
             Colorpicker.Saturation = ValueX
             Colorpicker.Value = ValueY
 
-            Items["PaletteDragger"].Instance.Position = UDim2New(ValueX, 0, 1 - ValueY, 0)
+            Items["PaletteDragger"].Instance.Position = UDim2New(ValueX, 0, ValueY, 0)
             Colorpicker:Update()
         end
 
