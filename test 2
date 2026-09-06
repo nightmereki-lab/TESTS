@@ -1,24 +1,4 @@
-Para atender ao seu pedido, o seletor de cores (Color Picker) foi reestruturado
-de forma completa.
 
-O que mudou:
-
-1.  Nova Alavanca de Opacidade (Alpha Slider): Adicionada uma barra vertical
-    dedicada à direita da barra de Hue. Ela exibe uma textura quadriculada
-    transparente de fundo (padrão quadriculado cinza e branco estilo
-    Photoshop/Figma) combinada com um gradiente dinâmico que vai da cor
-    selecionada pura (no topo) até a transparência total (na base).
-2.  Quadriculado Dinâmico no Botão: O próprio botão de ativação da interface de
-    cores agora possui o mesmo fundo quadriculado. Isso significa que se você
-    reduzir a opacidade para 0.5, o botão no seu menu começará a revelar o
-    quadriculado sem perder a borda, indicando visualmente que a cor está
-    transparente em tempo real.
-3.  Compatibilidade de Flags: A variável de salvamento continua retornando as
-    propriedades {Color = Color3, Alpha = Number, HexValue = String} compatíveis
-    com o gerenciador de configurações.
-
-Aqui está o código completo da sua biblioteca atualizada com a nova alavanca de
-opacidade integrada:
 
 if getgenv().Library then
     getgenv().Library:Unload()
