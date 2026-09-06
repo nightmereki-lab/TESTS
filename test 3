@@ -2739,7 +2739,6 @@ do
             return {SectionOutline = SectionOutline, Section = SectionFrame, Top = Top, Text = Text, Content = Content}
         end
 
-        local Active = false
         Library.Page = function(self, Data)
             Data = Data or {}
 
@@ -2871,17 +2870,19 @@ do
                 if not self.SubTabBar then
                     self.SubTabBar = Instances:Create("ScrollingFrame", {
                         Parent = self.Items["Page"].Instance.Parent,
-                        Size = UDim2New(1, 0, 0, 35),
-                        Position = UDim2New(0, 0, 0, 5),
+                        Size = UDim2New(1, 0, 0, 40),
+                        Position = UDim2New(0, 0, 0, 0),
                         BackgroundTransparency = 1,
                         ScrollingDirection = Enum.ScrollingDirection.X,
-                        AutomaticCanvasSize = Enum.AutomaticSize.X,
+                        AutomaticCanvasSize = Enum.AutomaticSize.None,
                         CanvasSize = UDim2New(0, 0, 0, 0),
                         ScrollBarThickness = 2,
                         ScrollBarImageColor3 = Library.Theme.Accent,
-                        Visible = false
+                        Visible = false,
+                        ClipsDescendants = true
                     }):AddToTheme({ScrollBarImageColor3 = "Accent"})
-                    Instances:Create("UIListLayout", {
+
+                    local SubTabLayout = Instances:Create("UIListLayout", {
                         Parent = self.SubTabBar.Instance,
                         FillDirection = Enum.FillDirection.Horizontal,
                         Padding = UDimNew(0, 8),
@@ -2890,10 +2891,17 @@ do
                     })
                     Instances:Create("UIPadding", {
                         Parent = self.SubTabBar.Instance,
-                        PaddingLeft = UDimNew(0, 25),
-                        PaddingRight = UDimNew(0, 25)
+                        PaddingLeft = UDimNew(0, 10),
+                        PaddingRight = UDimNew(0, 10),
+                        PaddingTop = UDimNew(0, 4),
+                        PaddingBottom = UDimNew(0, 4)
                     })
-                    
+
+                    -- Atualiza o canvas manualmente para evitar bug de AutomaticCanvasSize
+                    SubTabLayout.Instance:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                        self.SubTabBar.Instance.CanvasSize = UDim2New(0, SubTabLayout.Instance.AbsoluteContentSize.X + 20, 0, 0)
+                    end)
+
                     self.Items["Page"].Instance.Position = UDim2New(0, 0, 0, 45)
                     self.Items["Page"].Instance.Size = UDim2New(1, 0, 1, -45)
                 end
