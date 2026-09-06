@@ -1,5 +1,3 @@
-
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -1006,7 +1004,7 @@ do
         return nil
     end
 
-    -- REESCRITO: COLOR PICKER COM SELETOR DE OPACIDADE (ALPHA TRACK COM GRID QUADRICULADO)
+    -- SELETOR DE CORES COM SUPORTE ALPHA CORRIGIDO (Fim do erro de indexação de função)
     Library.CreateColorpicker = function(self, Data)
         Data = Data or {}
 
@@ -1048,7 +1046,6 @@ do
         Instances:Create("UICorner", {Parent = Items.ColorpickerButton.Instance, CornerRadius = UDimNew(0, 6)})
         Instances:Create("UIStroke", {Parent = Items.ColorpickerButton.Instance, Color = Library.Theme.Outline}):AddToTheme({Color = "Outline"})
 
-        -- Grid quadriculado de fundo para o botão indicador principal
         Items.ButtonCheckerboard = Instances:Create("ImageLabel", {
             Parent = Items.ColorpickerButton.Instance,
             Size = UDim2New(1, 0, 1, 0),
@@ -1060,7 +1057,6 @@ do
         })
         Instances:Create("UICorner", {Parent = Items.ButtonCheckerboard.Instance, CornerRadius = UDimNew(0, 6)})
 
-        -- Overlay de cor sólida do botão
         Items.ColorOverlay = Instances:Create("Frame", {
             Parent = Items.ColorpickerButton.Instance,
             Size = UDim2New(1, 0, 1, 0),
@@ -1077,7 +1073,6 @@ do
             SliceCenter = RectNew(Vector2New(21, 21), Vector2New(79, 79))
         })
 
-        -- Redimensionado o container da janela para acomodar as 3 colunas simetricamente (largura 220px)
         Items.ColorpickerWindow = Instances:Create("TextButton", {
             Parent = Library.UnusedHolder.Instance, Text = "", Active = true, AutoButtonColor = false,
             Size = UDim2New(0, 222, 0, 215), BorderSizePixel = 0,
@@ -1121,7 +1116,6 @@ do
         Instances:Create("UIStroke", {Parent = Items.PaletteDragger.Instance, Color = FromRGB(0, 0, 0), Thickness = 1.5, ZIndex = 20})
         Instances:Create("UICorner", {Parent = Items.PaletteDragger.Instance, CornerRadius = UDimNew(1, 0)})
 
-        -- COLUNA 1: HUE BAR (MATIZ DA COR)
         Items.Hue = Instances:Create("TextButton", {
             Parent = Items.ColorpickerWindow.Instance, Position = UDim2New(0, 174, 0, 8),
             Size = UDim2New(0, 16, 0, 160), Text = "", AutoButtonColor = false, Active = true,
@@ -1150,7 +1144,6 @@ do
         })
         Instances:Create("UIStroke", {Parent = Items.HueDragger.Instance, Color = FromRGB(255, 255, 255), Thickness = 1.5})
 
-        -- COLUNA 2: ALPHA BAR (OPACIDADE COM CHECKERBOARD PATTERN)
         Items.Alpha = Instances:Create("TextButton", {
             Parent = Items.ColorpickerWindow.Instance, Position = UDim2New(0, 198, 0, 8),
             Size = UDim2New(0, 16, 0, 160), Text = "", AutoButtonColor = false, Active = true,
@@ -1180,10 +1173,11 @@ do
         })
         Instances:Create("UICorner", {Parent = Items.AlphaGradientFrame.Instance, CornerRadius = UDimNew(0, 6)})
 
+        -- CORREÇÃO AQUI: Mudado NumSequence.new(0, 1) para NumSequence(0, 1) para evitar indexar função
         Items.AlphaGradient = Instances:Create("UIGradient", {
             Parent = Items.AlphaGradientFrame.Instance,
             Rotation = 90,
-            Transparency = NumSequence.new(0, 1) -- Opaco no topo (0) para Transparente no fundo (1)
+            Transparency = NumSequence(0, 1) 
         })
 
         Items.AlphaDragger = Instances:Create("Frame", {
@@ -1213,7 +1207,6 @@ do
             Colorpicker.Color = Colorpicker.Value
             Colorpicker.HexValue = Colorpicker.Value:ToHex()
             
-            -- Atualiza overlays e transparência com base no Alpha
             Items.ColorOverlay.Instance.BackgroundColor3 = Colorpicker.Value
             Items.ColorOverlay.Instance.BackgroundTransparency = 1 - Colorpicker.Alpha
             
@@ -1223,7 +1216,6 @@ do
             Items.Palette.Instance.BackgroundColor3 = FromHSV(Colorpicker.Hue, 1, 1)
             Items.AlphaGradientFrame.Instance.BackgroundColor3 = Colorpicker.Value
             
-            -- Posiciona os Draggers
             Items.PaletteDragger.Instance.Position = UDim2New(Colorpicker.Sat, 0, 1 - Colorpicker.Vib, 0)
             Items.HueDragger.Instance.Position = UDim2New(0, 0, Colorpicker.Hue, 0)
             Items.AlphaDragger.Instance.Position = UDim2New(0, 0, 1 - Colorpicker.Alpha, 0)
@@ -3102,6 +3094,7 @@ do
                 function SubTab:AddSection(Data)
                     Data = Data or {}
                     local Section = {
+                        ParentPage = self.Page,
                         Window = ParentPage.Window,
                         Page = ParentPage,
                         SubTab = SubTab,
@@ -4160,6 +4153,7 @@ do
                     Parent = Items["Main"],
                     Flag = Colorpicker.Flag,
                     Default = Data.Default,
+                    Alpha = Data.Alpha,
                     Callback = Data.Callback,
                     Section = Colorpicker.Section
                 })
