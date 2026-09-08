@@ -1,3 +1,5 @@
+
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -114,9 +116,7 @@ do
         NotifHolder = nil,
         UnusedHolder = nil,
         Font = nil,
-        
         CurrentPopupZIndex = 20000,
-
         BadgeColors = {
             BUG  = FromRGB(255, 75, 75),
             RISK = FromRGB(255, 215, 0),
@@ -127,6 +127,7 @@ do
         }
     }
 
+    -- === SISTEMA DE REATIVIDADE (CORREÇÃO DE TIMING) ===
     setmetatable(Library.SetFlags, {
         __newindex = function(t, flag, setFunction)
             rawset(t, flag, setFunction)
@@ -955,6 +956,42 @@ do
         return Success
     end
 
+    -- === CARREGAMENTO SÍNCRONO (FIX DO TIMING) ===
+    do
+        local loaded = false
+        if type(getgenv().MidnightConfig) == "table" then
+            local success = pcall(function()
+                for flagName, flagValue in pairs(getgenv().MidnightConfig) do
+                    Library.PendingConfig[flagName] = flagValue
+                end
+            end)
+            if success then
+                loaded = true
+                Library:Notify({
+                    Title = "Sincronizado",
+                    Content = "Configurações do getgenv() serão aplicadas!",
+                    Duration = 5,
+                    Type = "SAFE"
+                })
+            end
+        end
+
+        if not loaded and isfile and readfile and isfile("midnight_lib/autosave.json") then
+            local success, content = pcall(readfile, "midnight_lib/autosave.json")
+            if success and content then
+                local loadedConfig = Library:LoadConfig(content)
+                if loadedConfig then
+                    Library:Notify({
+                        Title = "Auto-Load",
+                        Content = "Configurações locais serão aplicadas!",
+                        Duration = 4,
+                        Type = "SAFE"
+                    })
+                end
+            end
+        end
+    end
+
     local function parseKey(keyStr)
         if not keyStr then return nil end
         if StringFind(keyStr, "Enum.KeyCode.") then
@@ -1134,7 +1171,6 @@ do
         })
         Instances:Create("UICorner", {Parent = Items.AlphaGradientFrame.Instance, CornerRadius = UDimNew(0, 6)})
 
-        -- === FIX: NumSequence localzado lá no topo como NumberSequence.new ===
         Items.AlphaGradient = Instances:Create("UIGradient", {
             Parent = Items.AlphaGradientFrame.Instance,
             Rotation = 90,
@@ -2418,49 +2454,10 @@ do
 
         setmetatable(Window, Library)
         
+        -- === ADICIONA APENAS O MENU DE CONFIG (LOAD FOI PARA O BLOCO SÍNCRONO ABAIXO) ===
         task.defer(function()
             if Window and Window.AddConfigPage then
                 Window:AddConfigPage()
-                
-                local loaded = false
-                if type(getgenv().MidnightConfig) == "table" then
-                    local success = pcall(function()
-                        for flagName, flagValue in pairs(getgenv().MidnightConfig) do
-                            local SetFunction = Library.SetFlags[flagName]
-                            if SetFunction then
-                                if type(flagValue) == "table" and flagValue.Color then
-                                    SetFunction(flagValue.Color, flagValue.Alpha)
-                                else
-                                    SetFunction(flagValue)
-                                end
-                            end
-                        end
-                    end)
-                    if success then
-                        loaded = true
-                        Library:Notify({
-                            Title = "Sincronizado",
-                            Content = "Configurações globais do getgenv() aplicadas automaticamente!",
-                            Duration = 5,
-                            Type = "SAFE"
-                        })
-                    end
-                end
-
-                if not loaded and isfile and readfile and isfile("midnight_lib/autosave.json") then
-                    local success, content = pcall(readfile, "midnight_lib/autosave.json")
-                    if success and content then
-                        local loadedConfig = Library:LoadConfig(content)
-                        if loadedConfig then
-                            Library:Notify({
-                                Title = "Auto-Load",
-                                Content = "Suas configurações anteriores salvas localmente foram aplicadas!",
-                                Duration = 4,
-                                Type = "SAFE"
-                            })
-                        end
-                    end
-                end
             end
         end)
 
