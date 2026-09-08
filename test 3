@@ -1,4 +1,5 @@
 
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -365,13 +366,20 @@ do
         Tween.Clean = function(self) if self.Tween then self:Pause() self = nil end end
     end
 
+    -- CORREÇÃO DO INJECT DE PROPRIEDADES (Tratamento seguro contra falha de FontFace em executores instáveis)
     local Instances = {} do
         Instances.__index = Instances
 
         Instances.Create = function(self, Class, Properties)
             local NewItem = { Instance = InstanceNew(Class), Properties = Properties, Class = Class }
             setmetatable(NewItem, Instances)
-            for Property, Value in pairs(NewItem.Properties) do NewItem.Instance[Property] = Value end
+            for Property, Value in pairs(NewItem.Properties) do 
+                if Property == "FontFace" and Value == nil then
+                    pcall(function() NewItem.Instance.Font = Enum.Font.SourceSans end)
+                else
+                    pcall(function() NewItem.Instance[Property] = Value end)
+                end
+            end
             return NewItem
         end
 
@@ -589,6 +597,58 @@ do
         HorizontalAlignment = Enum.HorizontalAlignment.Right,
         SortOrder = Enum.SortOrder.LayoutOrder
     })
+
+    -- TRATAMENTO DO CONSTRUTOR DE FONTE (Evita nil se Font.fromEnum falhar)
+    local CustomFont = {} do
+        function CustomFont:New(Name, Weight, Style, Data)
+            local success, fontObj = pcall(function()
+                if writefile and readfile and isfile and getcustomasset then
+                    if not isfile(Data.Id) then 
+                        local httpSuccess, response = pcall(function()
+                            return game:HttpGet(Data.Url, true)
+                        end)
+                        if httpSuccess and response then
+                            writefile(Data.Id, response)
+                        else
+                            error("Download da fonte falhou.")
+                        end
+                    end
+
+                    local FontData = {
+                        name = Name,
+                        faces = {
+                            {
+                                name = Name,
+                                weight = Weight,
+                                style = Style,
+                                assetId = getcustomasset(Data.Id)
+                            }
+                        }
+                    }
+
+                    writefile(StringFormat("%s/%s.font", Library.Folders.Assets, Name), HttpService:JSONEncode(FontData))
+                    return Font.new(getcustomasset(StringFormat("%s/%s.font", Library.Folders.Assets, Name)))
+                end
+            end)
+            if success and fontObj then
+                return fontObj
+            end
+            
+            -- Fallback seguro por pcall
+            local fallbackSuccess, fallbackFont = pcall(function()
+                return Font.fromEnum(Enum.Font.SourceSans)
+            end)
+            if fallbackSuccess and fallbackFont then
+                return fallbackFont
+            end
+            return nil -- Retorna nulo tratado (o construtor do Instances vai usar SourceSans por padrão sem estourar erro)
+        end
+
+        Library.Font = CustomFont:New("OutfitMedium", 400, "Regular", {
+            Id = "OutfitMedium",
+            Url = "https://github.com/sametexe001/luas/raw/refs/heads/main/fonts/Outfit-Medium.ttf"
+        })
+    end
 
     -- SELETOR DE CORES COM SUPORTE ALPHA
     Library.CreateColorpicker = function(self, Data)
@@ -1366,7 +1426,7 @@ do
             return Watermark 
         end
 
-        -- WINDOW
+        -- WINDOW (SISTEMA DE SEGURANÇA CONTRA ERROS DE FONTE)
         Library.Window = function(self, Data)
             Data = Data or {}
 
@@ -1431,40 +1491,46 @@ do
                     BorderSizePixel = 0
                 })
                 
-                local BottomSeparator = InstanceNew("Frame")
-                BottomSeparator.Parent = Items["Sidebar"].Instance
-                BottomSeparator.AnchorPoint = Vector2New(0, 1)
-                BottomSeparator.Position = UDim2New(0, 0, 1, -85)
-                BottomSeparator.Size = UDim2New(1, 0, 0, 1)
-                BottomSeparator.BackgroundColor3 = Library.Theme.Outline
-                BottomSeparator.BorderSizePixel = 0
+                local BottomSeparator = Instances:Create("Frame", {
+                    Parent = Items["Sidebar"].Instance,
+                    AnchorPoint = Vector2New(0, 1),
+                    Position = UDim2New(0, 0, 1, -85),
+                    Size = UDim2New(1, 0, 0, 1),
+                    BackgroundColor3 = Library.Theme.Outline,
+                    BorderSizePixel = 0
+                })
 
-                local BottomTab = InstanceNew("Frame")
-                BottomTab.Parent = Items["Sidebar"].Instance
-                BottomTab.AnchorPoint = Vector2New(0, 1)
-                BottomTab.Position = UDim2New(0, 0, 1, 20)
-                BottomTab.Size = UDim2New(1, 0, 0, 105)
-                BottomTab.BackgroundTransparency = 1
+                local BottomTab = Instances:Create("Frame", {
+                    Parent = Items["Sidebar"].Instance,
+                    AnchorPoint = Vector2New(0, 1),
+                    Position = UDim2New(0, 0, 1, 20),
+                    Size = UDim2New(1, 0, 0, 105),
+                    BackgroundTransparency = 1
+                })
 
-                local Avatar = InstanceNew("ImageLabel")
-                Avatar.Parent = BottomTab
-                Avatar.BackgroundTransparency = 1
-                Avatar.Size = UDim2New(0, 52, 0, 52)
-                Avatar.Position = UDim2New(0, 12, 0, 12)
+                local Avatar = Instances:Create("ImageLabel", {
+                    Parent = BottomTab.Instance,
+                    BackgroundTransparency = 1,
+                    Size = UDim2New(0, 52, 0, 52),
+                    Position = UDim2New(0, 12, 0, 12)
+                })
 
-                local AvatarCorner = InstanceNew("UICorner")
-                AvatarCorner.CornerRadius = UDimNew(1, 0)
-                AvatarCorner.Parent = Avatar
+                local AvatarCorner = Instances:Create("UICorner", {
+                    CornerRadius = UDimNew(1, 0),
+                    Parent = Avatar.Instance
+                })
 
-                local Username = InstanceNew("TextLabel")
-                Username.Parent = BottomTab
-                Username.BackgroundTransparency = 1
-                Username.Position = UDim2New(0, 74, 0, 16)
-                Username.Size = UDim2New(1, -84, 0, 18)
-                Username.TextXAlignment = Enum.TextXAlignment.Left
-                Username.FontFace = Library.Font
-                Username.TextSize = 16
-                Username.TextColor3 = Library.Theme.Text
+                local Username = Instances:Create("TextLabel", {
+                    Parent = BottomTab.Instance,
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 74, 0, 16),
+                    Size = UDim2New(1, -84, 0, 18),
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    FontFace = Library.Font,
+                    TextSize = 16,
+                    TextColor3 = Library.Theme.Text,
+                    Text = "Anonymous"
+                })
 
                 local isAnonymous = true
 
@@ -1484,8 +1550,8 @@ do
 
                 local function updateProfileDisplay()
                     if isAnonymous then
-                        Avatar.Image = "rbxassetid://10444634125"
-                        Username.Text = "Anonymous"
+                        Avatar.Instance.Image = "rbxassetid://10444634125"
+                        Username.Instance.Text = "Anonymous"
                     else
                         local thumbSuccess, thumbResult = pcall(function()
                             return Players:GetUserThumbnailAsync(
@@ -1494,37 +1560,37 @@ do
                                 Enum.ThumbnailSize.Size420x420
                             )
                         end)
-                        Avatar.Image = thumbSuccess and thumbResult or "rbxassetid://10444634125"
-                        Username.Text = LocalPlayer.Name
+                        Avatar.Instance.Image = thumbSuccess and thumbResult or "rbxassetid://10444634125"
+                        Username.Instance.Text = LocalPlayer.Name
                     end
                 end
 
                 updateProfileDisplay()
 
-                local Countdown = InstanceNew("TextLabel")
-                Countdown.Parent = BottomTab
-                Countdown.BackgroundTransparency = 1
-                Countdown.Position = UDim2New(0, 74, 0, 38)
-                Countdown.Size = UDim2New(1, -84, 0, 16)
-                Countdown.TextXAlignment = Enum.TextXAlignment.Left
-                Countdown.FontFace = Library.Font
-                Countdown.TextSize = 13
-                Countdown.TextColor3 = Library.Theme.Accent
+                local Countdown = Instances:Create("TextLabel", {
+                    Parent = BottomTab.Instance,
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 74, 0, 38),
+                    Size = UDim2New(1, -84, 0, 16),
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    FontFace = Library.Font,
+                    TextSize = 13,
+                    TextColor3 = Library.Theme.Accent,
+                    Text = phrases[1]
+                })
 
-                local phrases = {"MidNight Lib", "Safe & Clean", "Undetected", "New Functions"}
-                Countdown.Text = phrases[1]
                 local currentIndex = 1
 
                 Library:Thread(function()
-                    while Countdown and Countdown.Parent do
+                    while Countdown.Instance and Countdown.Instance.Parent do
                         task_wait(3)
-                        if not (Countdown and Countdown.Parent) then break end
+                        if not (Countdown.Instance and Countdown.Instance.Parent) then break end
                         currentIndex = currentIndex % #phrases + 1
-                        TweenService:Create(Countdown, TweenInfo.new(0.25), {TextTransparency = 1}):Play()
+                        TweenService:Create(Countdown.Instance, TweenInfo.new(0.25), {TextTransparency = 1}):Play()
                         task_wait(0.25)
-                        if not (Countdown and Countdown.Parent) then break end
-                        Countdown.Text = phrases[currentIndex]
-                        TweenService:Create(Countdown, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
+                        if not (Countdown.Instance and Countdown.Instance.Parent) then break end
+                        Countdown.Instance.Text = phrases[currentIndex]
+                        TweenService:Create(Countdown.Instance, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
                     end
                 end)
 
@@ -1892,6 +1958,7 @@ do
                 Window.Items = Items
             end
 
+            -- NOVO ADDPAGE SEM O BOTÃO DE IMPORTAR DO CLIPBOARD
             function Window:AddConfigPage()
                 if not self or not self.Items then return end
 
@@ -2631,7 +2698,7 @@ do
                 TweenService:Create(Items["Text"].Instance, TweenInfo.new(0.15), {TextTransparency = Toggle.Value and 0 or 0.25}):Play()
             end)
             Items["Toggle"]:Connect("MouseLeave", function()
-                TweenService:Create(Items["Text"].Instance, TweenInfo.new(0.15), {TextTransparency = Toggle.Value and 0 or 0.5}):Play()
+                TweenService:Create(Items["Text"].Instance, TweenInfo.new(0.15), {TextTransparency = Toggle.Valueand 0 or 0.5}):Play()
             end)
 
             Items["Toggle"]:Connect("MouseButton1Down", function() 
@@ -3493,121 +3560,6 @@ do
             Label.Section.Window:RegisterElement(l.Instance, "Label", Label.Text, Label.Section, Label.Section.Page)
             return Label
         end
-    end
-
-    -- SISTEMA DE NOTIFICAÇÕES E UNLOAD
-    local NotifList = Instances:Create("Frame", {
-        Parent = Library.Holder.Instance,
-        Size = UDim2New(0, 320, 1, -60),
-        Position = UDim2New(1, -340, 0, 30),
-        BackgroundTransparency = 1,
-        ZIndex = 999999
-    })
-    Instances:Create("UIListLayout", {
-        Parent = NotifList.Instance,
-        Padding = UDimNew(0, 10),
-        VerticalAlignment = Enum.VerticalAlignment.Bottom,
-        HorizontalAlignment = Enum.HorizontalAlignment.Right,
-        SortOrder = Enum.SortOrder.LayoutOrder
-    })
-
-    function Library:Notify(NotificationConfig)
-        NotificationConfig = NotificationConfig or {}
-        local Name = NotificationConfig.Name or NotificationConfig.Title or "Notification"
-        local Content = NotificationConfig.Content or NotificationConfig.Text or "Test"
-        local Image = NotificationConfig.Image or "rbxassetid://4384403532"
-        local Time = NotificationConfig.Time or NotificationConfig.Duration or 15
-
-        task.spawn(function()
-            local NotificationParent = Instances:Create("Frame", {
-                Size = UDim2New(1, 0, 0, 0),
-                AutomaticSize = Enum.AutomaticSize.Y,
-                BackgroundTransparency = 1,
-                Parent = NotifList.Instance
-            })
-
-            local NotificationFrame = Instances:Create("Frame", {
-                Parent = NotificationParent.Instance, 
-                Size = UDim2New(1, 0, 0, 0),
-                Position = UDim2New(1, -55, 0, 0),
-                BackgroundColor3 = FromRGB(255, 255, 255),
-                BackgroundTransparency = 0,
-                AutomaticSize = Enum.AutomaticSize.Y
-            })
-            NotificationFrame.Instance.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-            Instances:Create("UICorner", { Parent = NotificationFrame.Instance, CornerRadius = UDimNew(0, 10) })
-            
-            local UIStroke = Instances:Create("UIStroke", {
-                Parent = NotificationFrame.Instance,
-                Color = FromRGB(93, 93, 93),
-                Thickness = 1.2
-            })
-            
-            Instances:Create("UIPadding", {
-                Parent = NotificationFrame.Instance,
-                PaddingTop = UDimNew(0, 12),
-                PaddingBottom = UDimNew(0, 12),
-                PaddingLeft = UDimNew(0, 12),
-                PaddingRight = UDimNew(0, 12)
-            })
-
-            local Icon = Instances:Create("ImageLabel", {
-                Parent = NotificationFrame.Instance,
-                Size = UDim2New(0, 20, 0, 20),
-                Image = Image,
-                ImageColor3 = FromRGB(240, 240, 240),
-                BackgroundTransparency = 1,
-                Name = "Icon"
-            })
-
-            local Title = Instances:Create("TextLabel", {
-                Parent = NotificationFrame.Instance,
-                Size = UDim2New(1, -30, 0, 20),
-                Position = UDim2New(0, 30, 0, 0),
-                Text = Name,
-                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
-                TextSize = 15,
-                TextColor3 = FromRGB(255, 255, 255),
-                BackgroundTransparency = 1,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                Name = "Title"
-            })
-
-            local ContentLabel = Instances:Create("TextLabel", {
-                Parent = NotificationFrame.Instance,
-                Size = UDim2New(1, 0, 0, 0),
-                Position = UDim2New(0, 0, 0, 25),
-                Text = Content,
-                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
-                TextSize = 14,
-                TextColor3 = FromRGB(200, 200, 200),
-                BackgroundTransparency = 1,
-                TextWrapped = true,
-                AutomaticSize = Enum.AutomaticSize.Y,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                Name = "Content"
-            })
-
-            TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2New(0, 0, 0, 0)}):Play()
-
-            task_wait(Time - 0.88)
-            TweenService:Create(Icon.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 1}):Play()
-            TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.8, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.6}):Play()
-            task_wait(0.3)
-            TweenService:Create(UIStroke.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {Transparency = 0.9}):Play()
-            TweenService:Create(Title.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {TextTransparency = 0.4}):Play()
-            TweenService:Create(ContentLabel.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {TextTransparency = 0.5}):Play()
-            task_wait(0.05)
-
-            local exitTween = TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Position = UDim2New(1, 20, 0, 0)})
-            exitTween:Play()
-            task_wait(1.35)
-            NotificationParent:Clean()
-        end)
-    end
-
-    function Library:MakeNotification(NotificationConfig)
-        self:Notify(NotificationConfig)
     end
 
     Library.Unload = function(self)
