@@ -1,3 +1,5 @@
+
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -87,8 +89,8 @@ do
         ToggleKey = Enum.KeyCode.RightControl,
         AutoExecuteScript = "", 
         Flags = {},
-        SetFlags = {}, -- TABELA QUE SERÁ MONITORADA PELA METATABLE
-        PendingConfig = {}, -- FILA DE ESPERA PARA CONFIGURAÇÕES
+        SetFlags = {}, 
+        PendingConfig = {}, 
         IsInteracting = false,
         Tween = {
             Time = 0.2,
@@ -127,7 +129,7 @@ do
         }
     }
 
-    -- === FIX DE REATIVIDADE: GARANTE QUE O LOAD FUNCIONE MESMO SE O ELEMENTO AINDA NÃO EXISTIR ===
+    -- === SISTEMA DE REATIVIDADE (CORREÇÃO DEFINITIVA DE TIMING) ===
     setmetatable(Library.SetFlags, {
         __newindex = function(t, flag, setFunction)
             rawset(t, flag, setFunction)
@@ -656,6 +658,15 @@ do
         end)
         
         return Badge
+    end
+
+    function Library:IsMouseOverFrame(Item)
+        local Inst = Item.Instance or Item
+        if not Inst or not Inst.Parent then return false end
+        local MousePos = UserInputService:GetMouseLocation()
+        local Pos, Size = Inst.AbsolutePosition, Inst.AbsoluteSize
+        return MousePos.X >= Pos.X and MousePos.X <= Pos.X + Size.X
+           and MousePos.Y >= Pos.Y and MousePos.Y <= Pos.Y + Size.Y
     end
 
     Library.Holder = Instances:Create("ScreenGui", {
@@ -1526,12 +1537,6 @@ do
                 local parsedKey = parseKey(tostring(Key))
                 if parsedKey == Library.ToggleKey then
                     warn("⚠️ Conflito de tecla detectado!")
-                    Library:Notify({
-                        Title = "Conflito de Teclas",
-                        Content = "Esta tecla já está associada ao atalho para fechar o menu!",
-                        Duration = 4,
-                        Type = "RISK"
-                    })
                 end
 
                 Keybind.Key = tostring(Key)
@@ -3562,6 +3567,7 @@ do
             Items["TitleLabel"] = Instances:Create("TextLabel", { Parent = HeaderFrame.Instance, FontFace = Library.Font, TextColor3 = Library.Theme.Accent, Text = Paragraph.Title, Size = UDim2New(1, -25, 1, 0), BackgroundTransparency = 1, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left }):AddToTheme({TextColor3 = 'Accent'})
             Items["ContentLabel"] = Instances:Create("TextLabel", { Parent = Container.Instance, FontFace = Library.Font, TextColor3 = Library.Theme.Text, Text = Paragraph.Content, Size = UDim2New(1, 0, 0, 0), BackgroundTransparency = 1, TextSize = 13, TextTransparency = 0.3, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y, TextXAlignment = Enum.TextXAlignment.Left }):AddToTheme({TextColor3 = 'Text'})
         end
+        Paragraph.Section.Window:RegisterElement(Items["Main"].Instance, "Paragraph", Paragraph.Title, Paragraph.Section, Paragraph.Section.Page)
         return Paragraph
     end
 
@@ -3582,6 +3588,7 @@ do
             KBItems["KeyButton"].Instance.AnchorPoint = Vector2New(1, 0.5)
             KBItems["KeyButton"].Instance.Position = UDim2New(1, 0, 0.5, 0)
         end
+        Keybind.Section.Window:RegisterElement(Items["Main"].Instance, "Keybind", Keybind.Name, Keybind.Section, Keybind.Section.Page)
         return Keybind
     end
 
@@ -3602,6 +3609,7 @@ do
             CPItems["ColorpickerButton"].Instance.AnchorPoint = Vector2New(1, 0.5)
             CPItems["ColorpickerButton"].Instance.Position = UDim2New(1, 0, 0.5, 0)
         end
+        Colorpicker.Section.Window:RegisterElement(Items["Main"].Instance, "Colorpicker", Colorpicker.Name, Colorpicker.Section, Colorpicker.Section.Page)
         return Colorpicker
     end
 
@@ -3610,6 +3618,7 @@ do
         local Label = {Section = self, Text = Text}
         local l = Instances:Create("TextLabel", {Parent = Label.Section.Items["Content"].Instance, Text = Text, FontFace = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 15, BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Left})
         function Label:SetText(t) l.Instance.Text = t end
+        Label.Section.Window:RegisterElement(l.Instance, "Label", Label.Text, Label.Section, Label.Section.Page)
         return Label
     end
 
