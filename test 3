@@ -1,4 +1,3 @@
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -873,6 +872,15 @@ do
         return StringFormat('<font color="rgb(%s, %s, %s)">%s</font>', MathFloor(Color.R * 255), MathFloor(Color.G * 255), MathFloor(Color.B * 255), Text)
     end
 
+    -- METODO SILENCIOSO DE AUTO-SAVE
+    Library.SaveAutosave = function(self)
+        if not writefile then return end
+        pcall(function()
+            local rawData = self:GetConfig()
+            writefile("midnight_lib/autosave.json", rawData)
+        end)
+    end
+
     Library.GetConfig = function(self)
         local Config = {} 
         Library:SafeCall(function()
@@ -908,104 +916,7 @@ do
         return Success, Result
     end
 
-    Library.DeleteConfig = function(self, Config)
-        if not delfile then return end
-        local Path = Library.Folders.Configs .. "/" .. Config
-        if isfile and isfile(Path) then delfile(Path) end
-    end
-
-    Library.RefreshConfigsList = function(self, Element)
-        if not listfiles then return end
-        local success, List = pcall(listfiles, Library.Folders.Configs)
-        if not success or not List then return end
-        local ReturnList = {}
-
-        for Index = 1, #List do 
-            local File = List[Index]
-            if File:sub(-5) == ".json" then
-                local Position = File:find(".json", 1, true)
-                local StartPosition = Position
-                local Character = File:sub(Position, Position)
-                while Character ~= "/" and Character ~= "\\" and Character ~= "" do
-                    Position = Position - 1
-                    Character = File:sub(Position, Position)
-                end
-                if Character == "/" or Character == "\\" then
-                    TableInsert(ReturnList, File:sub(Position + 1, StartPosition - 1))
-                end
-            end
-        end
-        Element:Refresh(ReturnList)
-    end
-
-    Library.ChangeItemTheme = function(self, Item, Properties)
-        Item = Item.Instance or Item
-        if self.ThemeMap[Item] then 
-            self.ThemeMap[Item].Properties = Properties
-        end
-    end
-
-    Library.ChangeTheme = function(self, Theme, Color)
-        self.Theme[Theme] = Color
-        local activeItems = {}
-        for _, Item in ipairs(self.ThemeItems) do
-            local instance = Item.Item
-            local success, parent = pcall(function() return instance.Parent end)
-            if success and instance then
-                for Property, Value in pairs(Item.Properties) do
-                    if type(Value) == "string" and Value == Theme then
-                        instance[Property] = Color
-                    elseif type(Value) == "function" then
-                        instance[Property] = Value()
-                    end
-                end
-                TableInsert(activeItems, Item)
-            else
-                self.ThemeMap[instance] = nil
-            end
-        end
-        self.ThemeItems = activeItems
-    end
-
-    Library.IsMouseOverFrame = function(self, Frame)
-        Frame = Frame.Instance or Frame
-        local MousePosition = Vector2New(Mouse.X, Mouse.Y)
-        return MousePosition.X >= Frame.AbsolutePosition.X and MousePosition.X <= Frame.AbsolutePosition.X + Frame.AbsoluteSize.X 
-        and MousePosition.Y >= Frame.AbsolutePosition.Y and MousePosition.Y <= Frame.AbsolutePosition.Y + Frame.AbsoluteSize.Y
-    end
-
-    Library.Lerp = function(self, Start, Finish, Time)
-        return Start + (Finish - Start) * Time
-    end
-
-    Library.CompareVectors = function(self, PointA, PointB)
-        return (PointA.X < PointB.X) or (PointA.Y < PointB.Y)
-    end
-
-    Library.IsClipped = function(self, Object, Column)
-        local BoundryTop = Column.AbsolutePosition
-        local BoundryBottom = BoundryTop + Column.AbsoluteSize
-        local Top = Object.AbsolutePosition
-        local Bottom = Top + Object.AbsoluteSize 
-        return Library:CompareVectors(Top, BoundryTop) or Library:CompareVectors(BoundryBottom, Bottom)
-    end
-
-    local function parseKey(keyStr)
-        if not keyStr then return nil end
-        keyStr = tostring(keyStr)
-        if keyStr:find("Enum.KeyCode.") then
-            local name = keyStr:gsub("Enum.KeyCode.", "")
-            local success, enumObj = pcall(function() return Enum.KeyCode[name] end)
-            if success then return enumObj end
-        elseif keyStr:find("Enum.UserInputType.") then
-            local name = keyStr:gsub("Enum.UserInputType.", "")
-            local success, enumObj = pcall(function() return Enum.UserInputType[name] end)
-            if success then return enumObj end
-        end
-        return nil
-    end
-
-    -- Color picker based on the HSV map used by Library(2).
+    -- SELETOR DE CORES COM SUPORTE ALPHA
     Library.CreateColorpicker = function(self, Data)
         Data = Data or {}
 
@@ -1042,22 +953,41 @@ do
         Items.ColorpickerButton = Instances:Create("TextButton", {
             Parent = Data.Parent.Instance, Name = "\0", Text = "", Active = true,
             AutoButtonColor = false, Size = UDim2New(0, 20, 0, 16), BorderSizePixel = 0,
-            BackgroundColor3 = Colorpicker.Value
+            BackgroundTransparency = 1
         })
         Instances:Create("UICorner", {Parent = Items.ColorpickerButton.Instance, CornerRadius = UDimNew(0, 6)})
         Instances:Create("UIStroke", {Parent = Items.ColorpickerButton.Instance, Color = Library.Theme.Outline}):AddToTheme({Color = "Outline"})
+
+        Items.ButtonCheckerboard = Instances:Create("ImageLabel", {
+            Parent = Items.ColorpickerButton.Instance,
+            Size = UDim2New(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            Image = "rbxassetid://388701497",
+            ScaleType = Enum.ScaleType.Tile,
+            TileSize = UDim2FromOffset(6, 6),
+            ZIndex = 1
+        })
+        Instances:Create("UICorner", {Parent = Items.ButtonCheckerboard.Instance, CornerRadius = UDimNew(0, 6)})
+
+        Items.ColorOverlay = Instances:Create("Frame", {
+            Parent = Items.ColorpickerButton.Instance,
+            Size = UDim2New(1, 0, 1, 0),
+            BorderSizePixel = 0,
+            ZIndex = 2
+        })
+        Instances:Create("UICorner", {Parent = Items.ColorOverlay.Instance, CornerRadius = UDimNew(0, 6)})
 
         Items.Glow = Instances:Create("ImageLabel", {
             Parent = Items.ColorpickerButton.Instance, Image = "http://www.roblox.com/asset/?id=18245826428",
             ImageColor3 = Colorpicker.Value, ImageTransparency = 0.8, BackgroundTransparency = 1,
             Size = UDim2New(1, 25, 1, 25), Position = UDim2New(0.5, 0, 0.5, 0),
-            AnchorPoint = Vector2New(0.5, 0.5), ZIndex = 2, ScaleType = Enum.ScaleType.Slice,
+            AnchorPoint = Vector2New(0.5, 0.5), ZIndex = 3, ScaleType = Enum.ScaleType.Slice,
             SliceCenter = RectNew(Vector2New(21, 21), Vector2New(79, 79))
         })
 
         Items.ColorpickerWindow = Instances:Create("TextButton", {
             Parent = Library.UnusedHolder.Instance, Text = "", Active = true, AutoButtonColor = false,
-            Size = UDim2New(0, 236, 0, 215), BorderSizePixel = 0,
+            Size = UDim2New(0, 222, 0, 215), BorderSizePixel = 0,
             BackgroundColor3 = Library.Theme.Background
         }):AddToTheme({BackgroundColor3 = "Background"})
         Instances:Create("UICorner", {Parent = Items.ColorpickerWindow.Instance, CornerRadius = UDimNew(0, 6)})
@@ -1069,6 +999,7 @@ do
             ScaleType = Enum.ScaleType.Stretch, Active = true
         })
         Instances:Create("UICorner", {Parent = Items.Palette.Instance, CornerRadius = UDimNew(0, 5)})
+        
         Items.SaturationOverlay = Instances:Create("Frame", {
             Parent = Items.Palette.Instance, Size = UDim2New(1, 0, 1, 0),
             BackgroundColor3 = FromRGB(255, 255, 255), BorderSizePixel = 0,
@@ -1078,6 +1009,7 @@ do
             Parent = Items.SaturationOverlay.Instance,
             Transparency = NumSequence{NumSequenceKeypoint(0, 0), NumSequenceKeypoint(1, 1)}
         })
+        
         Items.ValueOverlay = Instances:Create("Frame", {
             Parent = Items.Palette.Instance, Size = UDim2New(1, 0, 1, 0),
             BackgroundColor3 = FromRGB(0, 0, 0), BorderSizePixel = 0,
@@ -1087,6 +1019,7 @@ do
             Parent = Items.ValueOverlay.Instance, Rotation = 90,
             Transparency = NumSequence{NumSequenceKeypoint(0, 1), NumSequenceKeypoint(1, 0)}
         })
+        
         Items.PaletteDragger = Instances:Create("Frame", {
             Parent = Items.Palette.Instance, Size = UDim2New(0, 8, 0, 8), AnchorPoint = Vector2New(0.5, 0.5),
             BackgroundColor3 = FromRGB(255, 255, 255), BackgroundTransparency = 0.15,
@@ -1116,11 +1049,53 @@ do
             Parent = Items.Hue.Instance,
             CornerRadius = UDimNew(0, 6)
         })
+        
         Items.HueDragger = Instances:Create("Frame", {
             Parent = Items.Hue.Instance, Size = UDim2New(1, 4, 0, 4), Position = UDim2New(0, -2, 0, 0),
             AnchorPoint = Vector2New(0, 0.5), BackgroundTransparency = 1, ZIndex = 5
         })
         Instances:Create("UIStroke", {Parent = Items.HueDragger.Instance, Color = FromRGB(255, 255, 255), Thickness = 1.5})
+
+        Items.Alpha = Instances:Create("TextButton", {
+            Parent = Items.ColorpickerWindow.Instance, Position = UDim2New(0, 198, 0, 8),
+            Size = UDim2New(0, 16, 0, 160), Text = "", AutoButtonColor = false, Active = true,
+            BackgroundColor3 = FromRGB(255, 255, 255), BorderSizePixel = 0
+        })
+        Instances:Create("UICorner", {
+            Parent = Items.Alpha.Instance,
+            CornerRadius = UDimNew(0, 6)
+        })
+        
+        Items.AlphaCheckerboard = Instances:Create("ImageLabel", {
+            Parent = Items.Alpha.Instance,
+            Size = UDim2New(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            Image = "rbxassetid://388701497",
+            ScaleType = Enum.ScaleType.Tile,
+            TileSize = UDim2FromOffset(10, 10),
+            ZIndex = 1
+        })
+        Instances:Create("UICorner", {Parent = Items.AlphaCheckerboard.Instance, CornerRadius = UDimNew(0, 6)})
+
+        Items.AlphaGradientFrame = Instances:Create("Frame", {
+            Parent = Items.Alpha.Instance,
+            Size = UDim2New(1, 0, 1, 0),
+            BorderSizePixel = 0,
+            ZIndex = 2
+        })
+        Instances:Create("UICorner", {Parent = Items.AlphaGradientFrame.Instance, CornerRadius = UDimNew(0, 6)})
+
+        Items.AlphaGradient = Instances:Create("UIGradient", {
+            Parent = Items.AlphaGradientFrame.Instance,
+            Rotation = 90,
+            Transparency = NumSequence(0, 1) 
+        })
+
+        Items.AlphaDragger = Instances:Create("Frame", {
+            Parent = Items.Alpha.Instance, Size = UDim2New(1, 4, 0, 4), Position = UDim2New(0, -2, 0, 0),
+            AnchorPoint = Vector2New(0, 0.5), BackgroundTransparency = 1, ZIndex = 5
+        })
+        Instances:Create("UIStroke", {Parent = Items.AlphaDragger.Instance, Color = FromRGB(255, 255, 255), Thickness = 1.5})
 
         Items.InputsContainer = Instances:Create("Frame", {
             Parent = Items.ColorpickerWindow.Instance, Position = UDim2New(0, 8, 0, 178),
@@ -1139,44 +1114,60 @@ do
         }):AddToTheme({BackgroundColor3 = "Inline", TextColor3 = "Text"})
 
         local function UpdateDisplay(notify)
-            Colorpicker.Alpha = 1
             Colorpicker.Value = FromHSV(Colorpicker.Hue, Colorpicker.Sat, Colorpicker.Vib)
             Colorpicker.Color = Colorpicker.Value
             Colorpicker.HexValue = Colorpicker.Value:ToHex()
-            Items.ColorpickerButton.Instance.BackgroundColor3 = Colorpicker.Value
-            Items.ColorpickerButton.Instance.BackgroundTransparency = 0
+            
+            Items.ColorOverlay.Instance.BackgroundColor3 = Colorpicker.Value
+            Items.ColorOverlay.Instance.BackgroundTransparency = 1 - Colorpicker.Alpha
+            
             Items.Glow.Instance.ImageColor3 = Colorpicker.Value
+            Items.Glow.Instance.ImageTransparency = 0.8 + (0.2 * (1 - Colorpicker.Alpha))
+            
             Items.Palette.Instance.BackgroundColor3 = FromHSV(Colorpicker.Hue, 1, 1)
+            Items.AlphaGradientFrame.Instance.BackgroundColor3 = Colorpicker.Value
+            
             Items.PaletteDragger.Instance.Position = UDim2New(Colorpicker.Sat, 0, 1 - Colorpicker.Vib, 0)
             Items.HueDragger.Instance.Position = UDim2New(0, 0, Colorpicker.Hue, 0)
+            Items.AlphaDragger.Instance.Position = UDim2New(0, 0, 1 - Colorpicker.Alpha, 0)
+            
             Items.HexInput.Instance.Text = "#" .. Colorpicker.HexValue:upper()
             Items.RGBInput.Instance.Text = StringFormat("%d,%d,%d", MathFloor(Colorpicker.Value.R * 255 + 0.5), MathFloor(Colorpicker.Value.G * 255 + 0.5), MathFloor(Colorpicker.Value.B * 255 + 0.5))
+            
             Library.Flags[Colorpicker.Flag] = {Color = Colorpicker.Value, Alpha = Colorpicker.Alpha, HexValue = Colorpicker.HexValue}
             if notify and Data.Callback then Library:SafeCall(Data.Callback, Colorpicker.Value, Colorpicker.Alpha) end
+            Library:SaveAutosave()
         end
 
         function Colorpicker:Get() return Colorpicker.Value, Colorpicker.Alpha end
+        
         function Colorpicker:SetValueRGB(color, alpha)
             if typeof(color) ~= "Color3" then return end
             Colorpicker.Hue, Colorpicker.Sat, Colorpicker.Vib = color:ToHSV()
+            Colorpicker.Alpha = alpha ~= nil and MathClamp(alpha, 0, 1) or Colorpicker.Alpha
             UpdateDisplay(true)
         end
+        
         function Colorpicker:SetValue(hsv, alpha)
             if typeof(hsv) == "Color3" then return Colorpicker:SetValueRGB(hsv, alpha) end
             if type(hsv) ~= "table" then return end
             Colorpicker.Hue = MathClamp(hsv[1] or 0, 0, 1)
             Colorpicker.Sat = MathClamp(hsv[2] or 0, 0, 1)
             Colorpicker.Vib = MathClamp(hsv[3] or 0, 0, 1)
+            Colorpicker.Alpha = alpha ~= nil and MathClamp(alpha, 0, 1) or Colorpicker.Alpha
             UpdateDisplay(true)
         end
+        
         function Colorpicker:Set(color, alpha)
+            local parsedAlpha = alpha
             if type(color) == "string" then color = ParseHex(color) end
             if type(color) == "table" then
+                parsedAlpha = color.Alpha or parsedAlpha
                 color = color.Color or color
                 if type(color) == "string" then color = ParseHex(color) end
                 if type(color) == "table" then color = FromRGB(color[1], color[2], color[3]) end
             end
-            if typeof(color) == "Color3" then Colorpicker:SetValueRGB(color, alpha) end
+            if typeof(color) == "Color3" then Colorpicker:SetValueRGB(color, parsedAlpha) end
         end
 
         local function BeginDrag(kind, input)
@@ -1190,11 +1181,16 @@ do
             elseif kind == "SlidingHue" then
                 local item = Items.Hue.Instance
                 Colorpicker.Hue = MathClamp((input.Position.Y - item.AbsolutePosition.Y) / math.max(item.AbsoluteSize.Y, 1), 0, 1)
+            elseif kind == "SlidingAlpha" then
+                local item = Items.Alpha.Instance
+                Colorpicker.Alpha = 1 - MathClamp((input.Position.Y - item.AbsolutePosition.Y) / math.max(item.AbsoluteSize.Y, 1), 0, 1)
             end
             UpdateDisplay(true)
         end
         Items.Palette:Connect("InputBegan", function(input) BeginDrag("SlidingPalette", input) end)
         Items.Hue:Connect("InputBegan", function(input) BeginDrag("SlidingHue", input) end)
+        Items.Alpha:Connect("InputBegan", function(input) BeginDrag("SlidingAlpha", input) end)
+        
         Library:Connect(UserInputService.InputChanged, function(input)
             if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
             if Colorpicker.SlidingPalette then
@@ -1204,12 +1200,16 @@ do
             elseif Colorpicker.SlidingHue then
                 local item = Items.Hue.Instance
                 Colorpicker.Hue = MathClamp((input.Position.Y - item.AbsolutePosition.Y) / math.max(item.AbsoluteSize.Y, 1), 0, 1)
+            elseif Colorpicker.SlidingAlpha then
+                local item = Items.Alpha.Instance
+                Colorpicker.Alpha = 1 - MathClamp((input.Position.Y - item.AbsolutePosition.Y) / math.max(item.AbsoluteSize.Y, 1), 0, 1)
             else return end
             UpdateDisplay(true)
         end)
+        
         Library:Connect(UserInputService.InputEnded, function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                Colorpicker.SlidingPalette, Colorpicker.SlidingHue = false, false
+                Colorpicker.SlidingPalette, Colorpicker.SlidingHue, Colorpicker.SlidingAlpha = false, false, false
                 Library.IsInteracting = false
             end
         end)
@@ -1456,6 +1456,7 @@ do
             }
 
             if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
+            Library:SaveAutosave()
         end
 
         function Keybind:Press(Bool)
@@ -1474,6 +1475,7 @@ do
             }
 
             if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
+            Library:SaveAutosave()
         end
 
         function Keybind:Get() return Keybind.Key, Keybind.Mode, Keybind.Toggled end
@@ -1482,10 +1484,10 @@ do
             if StringFind(tostring(Key), "Enum") then 
                 local parsedKey = parseKey(tostring(Key))
                 if parsedKey == Library.ToggleKey then
-                    warn("⚠️ Conflito de tecla detectado com o atalho principal da GUI!")
+                    warn("⚠️ Conflito de tecla detectado!")
                     Library:Notify({
                         Title = "Conflito de Teclas",
-                        Content = "Esta tecla já está associada ao atalho para abrir/fechar o menu!",
+                        Content = "Esta tecla já está associada ao atalho para fechar o menu!",
                         Duration = 4,
                         Type = "RISK"
                     })
@@ -1507,6 +1509,7 @@ do
                 }
 
                 if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
+                Library:SaveAutosave()
             elseif type(Key) == "table" then
                 local RealKey = (Key.Key == "Backspace") and "None" or Key.Key
                 Keybind.Key = tostring(Key.Key)
@@ -1520,10 +1523,12 @@ do
                 Items["KeyButton"].Instance.Text = "["..TextToDisplay.."]"
 
                 if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
+                Library:SaveAutosave()
             elseif TableFind({"Toggle", "Hold", "Always"}, Key) then
                 Keybind.Mode = Key
                 Keybind:SetMode(Key)
                 if Data.Callback then Library:SafeCall(Data.Callback, Keybind.Toggled) end
+                Library:SaveAutosave()
             end
 
             Keybind.Picking = false
@@ -2213,333 +2218,118 @@ do
                 Window.Items = Items
             end
 
+            -- NOVO ADDPAGE TOTALMENTE SIMPLIFICADO (SEM THEME, SEM TELEPORT, SÓ CLIPBOARD UNIVERSAL)
             function Window:AddConfigPage()
                 if not self or not self.Items then return end
 
                 local ConfigPage = self:AddPage({Name = "Config", Icon = "rbxassetid://11419114175"})
                 
-                local ConfigSec = ConfigPage:AddSection({Name = "Save Manager"})
+                local ShareSec = ConfigPage:AddSection({Name = "Configurações"})
                 
-                local InputFrame = Instances:Create("Frame", {
-                    Parent = ConfigSec.Items["Content"].Instance,
-                    Size = UDim2New(1, 0, 0, 30),
-                    BackgroundTransparency = 1
-                })
-                
-                local TextLabel = Instances:Create("TextLabel", {
-                    Parent = InputFrame.Instance,
-                    Text = "Config Name:",
-                    FontFace = Library.Font,
-                    TextColor3 = Library.Theme.Text,
-                    TextSize = 14,
-                    Size = UDim2New(0.3, 0, 1, 0),
-                    BackgroundTransparency = 1,
-                    TextXAlignment = Enum.TextXAlignment.Left
-                }):AddToTheme({TextColor3 = "Text"})
-                
-                local TextBox = Instances:Create("TextBox", {
-                    Parent = InputFrame.Instance,
-                    Size = UDim2New(0.7, 0, 1, 0),
-                    Position = UDim2New(0.3, 0, 0, 0),
-                    BackgroundColor3 = Library.Theme.Element,
-                    Text = "",
-                    PlaceholderText = "Nome...",
-                    PlaceholderColor3 = FromRGB(120, 120, 130),
-                    TextColor3 = Library.Theme.Text,
-                    FontFace = Library.Font,
-                    TextSize = 13,
-                    ClearTextOnFocus = false
-                }):AddToTheme({BackgroundColor3 = "Element", TextColor3 = "Text"})
-                Instances:Create("UICorner", { Parent = TextBox.Instance, CornerRadius = UDimNew(0, 6) })
-                Instances:Create("UIStroke", { Parent = TextBox.Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = "Outline"})
-                
-                local SelectedConfig = "None"
-
-                local autoloadPath = "midnight_lib/autoload.json"
-                local autoloadData = {Enabled = false, Config = "None"}
-
-                if isfile and readfile and isfile(autoloadPath) then
-                    local success, decoded = pcall(function()
-                        return HttpService:JSONDecode(readfile(autoloadPath))
-                    end)
-                    if success and decoded then
-                        autoloadData = decoded
-                    end
-                end
-
-                local ConfigDropdown = ConfigSec:AddDropdown({
-                    Name = "Select Config",
-                    Items = {},
-                    Callback = function(val)
-                        SelectedConfig = val
-                        if autoloadData.Enabled and val ~= "None" and val ~= "" then
-                            autoloadData.Config = val
-                            if writefile then
-                                pcall(writefile, autoloadPath, HttpService:JSONEncode(autoloadData))
-                            end
-                        end
-                    end
-                })
-                
-                local function RefreshConfigs()
-                    if not listfiles then
-                        ConfigDropdown:Refresh({"FS não suportado"})
-                        return
-                    end
-                    local success, files = pcall(listfiles, Library.Folders.Configs)
-                    if not success then
-                        ConfigDropdown:Refresh({"Erro ao ler pasta"})
-                        return
-                    end
-                    local cleanFiles = {}
-                    for _, file in ipairs(files) do
-                        if file:sub(-5) == ".json" then
-                            local filename = file:match("([^/\\]+)%.json$")
-                            if filename then
-                                TableInsert(cleanFiles, filename)
-                            end
-                        end
-                    end
-                    ConfigDropdown:Refresh(cleanFiles)
-                end
-
-                local isAutoloadUpdating = false
-                local AutoloadToggle
-                AutoloadToggle = ConfigSec:AddToggle({
-                    Name = "Auto-Load Selected Config",
-                    Default = autoloadData.Enabled,
-                    Callback = function(state)
-                        if isAutoloadUpdating then return end
-                        if not writefile then return end
-                        if state then
-                            if SelectedConfig == "None" or SelectedConfig == "" then
-                                Library:Notify({Title = "Aviso", Content = "Selecione uma configuração no Dropdown primeiro.", Duration = 4, Type = "RISK"})
-                                isAutoloadUpdating = true
-                                AutoloadToggle:Set(false)
-                                isAutoloadUpdating = false
-                                return
-                            end
-                            autoloadData.Enabled = true
-                            autoloadData.Config = SelectedConfig
-                        else
-                            autoloadData.Enabled = false
-                        end
-                        pcall(writefile, autoloadPath, HttpService:JSONEncode(autoloadData))
-                    end
-                })
-                
-                ConfigSec:AddButton({
-                    Name = "Create / Save Config",
-                    Callback = function()
-                        if not writefile then return end
-                        local name = TextBox.Instance.Text:gsub("^%s*(.-)%s*$", "%1")
-                        if name == "" then
-                            Library:Notify({Title = "Aviso", Content = "Insira um nome válido para a config.", Duration = 4, Type = "RISK"})
-                            return
-                        end
-                        local rawData = Library:GetConfig()
-                        local ok, err = pcall(writefile, Library.Folders.Configs .. "/" .. name .. ".json", rawData)
-                        if ok then
-                            Library:Notify({Title = "Configurações", Content = "Configuração '" .. name .. "' salva com sucesso!", Duration = 4, Type = "SAFE"})
-                        else
-                            Library:Notify({Title = "Erro", Content = "Falha ao gravar arquivo: " .. tostring(err), Duration = 5, Type = "BUG"})
-                        end
-                        RefreshConfigs()
-                    end
-                })
-                
-                ConfigSec:AddButton({
-                    Name = "Load Selected Config",
-                    Callback = function()
-                        if not readfile or not isfile then return end
-                        if SelectedConfig == "None" or SelectedConfig == "" then
-                            Library:Notify({Title = "Aviso", Content = "Selecione uma configuração primeiro.", Duration = 4, Type = "RISK"})
-                            return
-                        end
-                        local path = Library.Folders.Configs .. "/" .. SelectedConfig .. ".json"
-                        if isfile(path) then
-                            local data = readfile(path)
-                            local success, err = Library:LoadConfig(data)
-                            if success then
-                                Library:Notify({Title = "Configurações", Content = "Configuração '" .. SelectedConfig .. "' carregada!", Duration = 4, Type = "SAFE"})
-                            else
-                                Library:Notify({Title = "Erro", Content = "Falha ao carregar: " .. tostring(err), Duration = 5, Type = "BUG"})
-                            end
-                        end
-                    end
-                })
-
-                ConfigSec:AddButton({
-                    Name = "Delete Selected Config",
-                    Callback = function()
-                        if not delfile or not isfile then return end
-                        if SelectedConfig == "None" or SelectedConfig == "" then
-                            Library:Notify({Title = "Aviso", Content = "Selecione uma configuração para deletar.", Duration = 4, Type = "RISK"})
-                            return
-                        end
-                        local path = Library.Folders.Configs .. "/" .. SelectedConfig .. ".json"
-                        if isfile(path) then
-                            delfile(path)
-                            Library:Notify({Title = "Deletado", Content = "Configuração '" .. SelectedConfig .. "' deletada.", Duration = 4, Type = "NEW"})
-                            SelectedConfig = "None"
-                            RefreshConfigs()
-                        end
-                    end
-                })
-
-                ConfigSec:AddButton({
-                    Name = "Refresh List",
-                    Callback = function()
-                        RefreshConfigs()
-                        Library:Notify({Title = "Sucesso", Content = "Lista de configurações atualizada.", Duration = 3, Type = "SAFE"})
-                    end
-                })
-
-                local CopySec = ConfigPage:AddSection({Name = "Share Config"})
-                
-                CopySec:AddParagraph({
-                    Title = "Exportar / Importar Configurações",
-                    Content = "• Salve seus perfis de forma persistente utilizando o gerenciador acima.\n\n• Clique no botão de cópia abaixo para enviar a sua configuração selecionada para a área de transferência.\n\n• Use o botão de importação para carregar rapidamente qualquer código compartilhado copiado em sua área de transferência.",
+                ShareSec:AddParagraph({
+                    Title = "Auto-Save Automático",
+                    Content = "• Suas alterações são salvas automaticamente a cada clique.\n• O carregamento do arquivo local ocorre sozinho ao iniciar o script.",
                     Icon = "rbxassetid://11419114175"
                 })
 
-                CopySec:AddButton({
-                    Name = "Copy Selected/Active Config",
+                -- Método: Gerar Luau Table e Copiar para Clipboard
+                ShareSec:AddButton({
+                    Name = "Copiar Configuração (Luau)",
                     Callback = function()
                         if not setclipboard then
-                            Library:Notify({Title = "Não Suportado", Content = "Seu Executor não possui suporte para colar no clipboard.", Duration = 4, Type = "RISK"})
+                            Library:Notify({Title = "Não Suportado", Content = "Seu executor não suporta copiar para a área de transferência.", Duration = 4, Type = "RISK"})
                             return
                         end
 
-                        local configToCopy = ""
-                        if SelectedConfig ~= "None" and SelectedConfig ~= "" then
-                            local path = Library.Folders.Configs .. "/" .. SelectedConfig .. ".json"
-                            if isfile(path) then
-                                configToCopy = readfile(path)
-                            end
-                        else
-                            configToCopy = Library:GetConfig()
-                        end
+                        local luauLines = {
+                            "getgenv().MidnightConfig = {",
+                        }
 
-                        if configToCopy ~= "" then
-                            local ok, err = pcall(setclipboard, configToCopy)
-                            if ok then
-                                Library:Notify({Title = "Configurações", Content = "Configuração copiada para a área de transferência!", Duration = 4, Type = "SAFE"})
-                            else
-                                Library:Notify({Title = "Erro", Content = "Erro ao copiar para clipboard: " .. tostring(err), Duration = 5, Type = "BUG"})
-                            end
-                        else
-                            Library:Notify({Title = "Aviso", Content = "Não há nenhuma configuração válida para copiar.", Duration = 4, Type = "RISK"})
-                        end
-                    end
-                })
-
-                CopySec:AddButton({
-                    Name = "Load Config from Clipboard",
-                    Callback = function()
-                        if not getclipboard then
-                            Library:Notify({Title = "Não Suportado", Content = "Seu Executor não possui suporte para ler a área de transferência.", Duration = 4, Type = "RISK"})
-                            return
-                        end
-
-                        local ok, clipboardData = pcall(getclipboard)
-                        if ok and clipboardData and clipboardData ~= "" then
-                            local jsonOk, decoded = pcall(function()
-                                return HttpService:JSONDecode(clipboardData)
-                            end)
-
-                            if jsonOk and decoded then
-                                local desiredName = TextBox.Instance.Text:gsub("^%s*(.-)%s*$", "%1")
-                                if desiredName == "" then
-                                    desiredName = "Imported"
-                                end
-
-                                local function getUniqueConfigName(baseName)
-                                    local name = baseName
-                                    local path = Library.Folders.Configs .. "/" .. name .. ".json"
-                                    if not isfile(path) then
-                                        return name
-                                    end
-                                    
-                                    local counter = 1
-                                    while true do
-                                        local newName = name .. "_" .. tostring(counter)
-                                        local newPath = Library.Folders.Configs .. "/" .. newName .. ".json"
-                                        if not isfile(newPath) then
-                                            return newName
+                        for Flag, Value in pairs(Library.Flags) do
+                            if Flag ~= "UI_Menu_Toggle_Bind" then -- Evita copiar o bind de fechar do próprio usuário
+                                local formattedVal = ""
+                                if type(Value) == "table" then
+                                    if Value.Color then
+                                        local r, g, b = MathFloor(Value.Color.R * 255 + 0.5), MathFloor(Value.Color.G * 255 + 0.5), MathFloor(Value.Color.B * 255 + 0.5)
+                                        formattedVal = StringFormat("{Color = Color3.fromRGB(%d, %d, %d), Alpha = %s}", r, g, b, tostring(Value.Alpha or 1))
+                                    else
+                                        local subItems = {}
+                                        for k, v in pairs(Value) do
+                                            local formattedK = type(k) == "string" and StringFormat("[%q]", k) or StringFormat("[%s]", tostring(k))
+                                            local formattedV = type(v) == "string" and StringFormat("%q", v) or tostring(v)
+                                            TableInsert(subItems, StringFormat("%s = %s", formattedK, formattedV))
                                         end
-                                        counter = counter + 1
+                                        formattedVal = "{" .. TableConcat(subItems, ", ") .. "}"
                                     end
-                                end
-
-                                local uniqueName = getUniqueConfigName(desiredName)
-                                local filePath = Library.Folders.Configs .. "/" .. uniqueName .. ".json"
-
-                                if writefile then
-                                    writefile(filePath, clipboardData)
-                                end
-
-                                RefreshConfigs()
-
-                                local success, err = Library:LoadConfig(clipboardData)
-                                if success then
-                                    Library:Notify({
-                                        Title = "Importado", 
-                                        Content = "Configuração salva como '" .. uniqueName .. "' e aplicada!", 
-                                        Duration = 5, 
-                                        Type = "SAFE"
-                                    })
+                                elseif type(Value) == "string" then
+                                    formattedVal = StringFormat("%q", Value)
                                 else
-                                    Library:Notify({Title = "Erro ao Aplicar", Content = "Falha ao injetar dados na interface.", Duration = 4, Type = "BUG"})
+                                    formattedVal = tostring(Value)
                                 end
-                            else
-                                Library:Notify({Title = "Erro ao Importar", Content = "Os dados da área de transferência são inválidos (Não são JSON).", Duration = 4, Type = "BUG"})
+                                TableInsert(luauLines, StringFormat("    [%q] = %s,", Flag, formattedVal))
                             end
-                        else
-                            Library:Notify({Title = "Erro", Content = "Área de transferência vazia ou falha na leitura.", Duration = 4, Type = "BUG"})
                         end
-                    end
-                })
+                        TableInsert(luauLines, "}")
 
-                local AutoExecSec = ConfigPage:AddSection({Name = "Auto Re-Execute"})
-                
-                AutoExecSec:AddParagraph({
-                    Title = "Re-execução de Script em Teleporte",
-                    Content = "• Ao ativar esta opção, o sistema enfileirará automaticamente o carregamento do script em teletransportes ou Server Hops.\n\n• O código executado é predefinido de forma invisível e segura no código fonte do desenvolvedor.",
-                    Icon = "rbxassetid://11419114175"
-                })
-
-                local autoTeleportPath = "midnight_lib/auto_teleport.json"
-                local autoTeleportData = {Enabled = false}
-                if isfile and readfile and isfile(autoTeleportPath) then
-                    local success, decoded = pcall(function()
-                        return HttpService:JSONDecode(readfile(autoTeleportPath))
-                    end)
-                    if success and decoded then
-                        autoTeleportData = decoded
-                    end
-                end
-
-                AutoExecSec:AddToggle({
-                    Name = "Auto Re-Execute on Teleport",
-                    Default = autoTeleportData.Enabled,
-                    Callback = function(state)
-                        autoTeleportData.Enabled = state
-                        if writefile then
-                            pcall(writefile, autoTeleportPath, HttpService:JSONEncode(autoTeleportData))
-                        end
-                        if state then
+                        local luauScript = TableConcat(luauLines, "\n")
+                        local ok, err = pcall(setclipboard, luauScript)
+                        if ok then
                             Library:Notify({
-                                Title = "Re-Execute Ativo",
-                                Content = "O menu será recarregado automaticamente após trocar de servidor.",
+                                Title = "Copiado",
+                                Content = "Código de configuração universal Luau copiado para o clipboard!",
                                 Duration = 4,
                                 Type = "SAFE"
                             })
+                        else
+                            Library:Notify({Title = "Erro", Content = "Falha ao copiar: " .. tostring(err), Duration = 4, Type = "BUG"})
                         end
                     end
                 })
 
-                local GuiSec = ConfigPage:AddSection({Name = "GUI Keybind"})
+                -- Método: Ler Código da área de transferência e aplicar em tempo real
+                ShareSec:AddButton({
+                    Name = "Importar do Clipboard e Aplicar",
+                    Callback = function()
+                        if not getclipboard then
+                            Library:Notify({Title = "Não Suportado", Content = "Seu executor não suporta ler a área de transferência.", Duration = 4, Type = "RISK"})
+                            return
+                        end
+
+                        local ok, text = pcall(getclipboard)
+                        if ok and text and text ~= "" then
+                            local loadOk, fn = pcall(loadstring, text)
+                            if loadOk and fn then
+                                local runOk, err = pcall(fn)
+                                if runOk and type(getgenv().MidnightConfig) == "table" then
+                                    for flagName, flagValue in pairs(getgenv().MidnightConfig) do
+                                        local SetFunction = Library.SetFlags[flagName]
+                                        if SetFunction then
+                                            if type(flagValue) == "table" and flagValue.Color then
+                                                SetFunction(flagValue.Color, flagValue.Alpha)
+                                            else
+                                                SetFunction(flagValue)
+                                            end
+                                        end
+                                    end
+                                    Library:SaveAutosave()
+                                    Library:Notify({
+                                        Title = "Importado",
+                                        Content = "Configurações importadas e aplicadas!",
+                                        Duration = 4,
+                                        Type = "SAFE"
+                                    })
+                                    return
+                                end
+                            end
+                            Library:Notify({Title = "Erro ao Importar", Content = "Texto da área de transferência inválido ou incompatível.", Duration = 4, Type = "BUG"})
+                        else
+                            Library:Notify({Title = "Área Vazia", Content = "Área de transferência vazia.", Duration = 4, Type = "BUG"})
+                        end
+                    end
+                })
+
+                -- SEÇÃO: ATALHO DO MENU
+                local GuiSec = ConfigPage:AddSection({Name = "Atalho do Menu"})
 
                 GuiSec:AddKeybind({
                     Name = "Toggle Menu Keybind",
@@ -2556,21 +2346,6 @@ do
                         end
                     end
                 })
-
-                local ThemeSec = ConfigPage:AddSection({Name = "Theme Customization"})
-                
-                local ThemeKeys = {"Accent", "Background", "Inline", "Outline", "Element", "Text"}
-                for _, key in ipairs(ThemeKeys) do
-                    ThemeSec:AddColorpicker({
-                        Name = key .. " Color",
-                        Default = Library.Theme[key],
-                        Callback = function(col)
-                            Library:ChangeTheme(key, col)
-                        end
-                    })
-                end
-
-                RefreshConfigs()
             end
 
             if Data.MinimizeButton ~= false then
@@ -2608,62 +2383,49 @@ do
                 if Window and Window.AddConfigPage then
                     Window:AddConfigPage()
                     
-                    if isfile and readfile and isfile("midnight_lib/autoload.json") then
-                        local success, decoded = pcall(function()
-                            return HttpService:JSONDecode(readfile("midnight_lib/autoload.json"))
-                        end)
-                        if success and decoded and decoded.Enabled and decoded.Config then
-                            local configPath = Library.Folders.Configs .. "/" .. decoded.Config .. ".json"
-                            if isfile(configPath) then
-                                local configData = readfile(configPath)
-                                local loaded, err = Library:LoadConfig(configData)
-                                if loaded then
-                                    Library:Notify({
-                                        Title = "Autoload",
-                                        Content = "Configuração '" .. decoded.Config .. "' carregada automaticamente!",
-                                        Duration = 5,
-                                        Type = "SAFE"
-                                    })
-                                else
-                                    warn("Erro no Autoload: " .. tostring(err))
+                    local loaded = false
+                    -- CARREGAMENTO AUTOMÁTICO VIA GETGENV (Se definido antes da lib rodar)
+                    if type(getgenv().MidnightConfig) == "table" then
+                        local success = pcall(function()
+                            for flagName, flagValue in pairs(getgenv().MidnightConfig) do
+                                local SetFunction = Library.SetFlags[flagName]
+                                if SetFunction then
+                                    if type(flagValue) == "table" and flagValue.Color then
+                                        SetFunction(flagValue.Color, flagValue.Alpha)
+                                    else
+                                        SetFunction(flagValue)
+                                    end
                                 end
+                            end
+                        end)
+                        if success then
+                            loaded = true
+                            Library:Notify({
+                                Title = "Sincronizado",
+                                Content = "Configurações globais do getgenv() aplicadas automaticamente!",
+                                Duration = 5,
+                                Type = "SAFE"
+                            })
+                        end
+                    end
+
+                    -- CARREGAMENTO AUTOMÁTICO VIA ARQUIVO DE AUTO-SALVAMENTO LOCAL (Se nenhum getgenv foi definido)
+                    if not loaded and isfile and readfile and isfile("midnight_lib/autosave.json") then
+                        local success, content = pcall(readfile, "midnight_lib/autosave.json")
+                        if success and content then
+                            local loadedConfig, err = Library:LoadConfig(content)
+                            if loadedConfig then
+                                Library:Notify({
+                                    Title = "Auto-Load",
+                                    Content = "Suas configurações anteriores salvas localmente foram aplicadas!",
+                                    Duration = 4,
+                                    Type = "SAFE"
+                                })
                             end
                         end
                     end
                 end
             end)
-
-            local teleportConnection
-            local function setupTeleportListener()
-                if teleportConnection then return end
-                local queue_teleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
-                
-                if queue_teleport then
-                    pcall(function()
-                        teleportConnection = Players.LocalPlayer.OnTeleport:Connect(function(State)
-                            if State == Enum.TeleportState.Started then
-                                local isEnabled = false
-                                local autoTeleportPath = "midnight_lib/auto_teleport.json"
-                                
-                                if isfile and readfile and isfile(autoTeleportPath) then
-                                    pcall(function()
-                                        local decoded = HttpService:JSONDecode(readfile(autoTeleportPath))
-                                        isEnabled = decoded.Enabled
-                                    end)
-                                end
-
-                                if isEnabled then
-                                    local scriptToQueue = Library.AutoExecuteScript
-                                    if scriptToQueue and scriptToQueue ~= "" then
-                                        queue_teleport(scriptToQueue)
-                                    end
-                                end
-                            end
-                        end)
-                    end)
-                end
-            end
-            setupTeleportListener()
 
             Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
                 if GameProcessed then return end
@@ -2836,7 +2598,7 @@ do
                 end
             end
 
-            -- REESCRITA COMPLETA DO SISTEMA DE SUB-ABAS (SUB TABS)
+            -- SISTEMA DE SUB-ABAS (SUB TABS)
             function Page:AddSubTab(SubTabData)
                 SubTabData = SubTabData or {}
                 local ParentPage = self
@@ -2859,9 +2621,8 @@ do
                     return self.SubTabs[#self.SubTabs]
                 end
 
-                -- Se for a primeira sub-aba, inicializamos a estrutura de layout interna da página
                 if not self.SubTabContainer then
-                    self.Items["Page"].Instance.Visible = false -- Ocultamos o ScrollingFrame padrão da página
+                    self.Items["Page"].Instance.Visible = false 
                     
                     self.SubTabContainer = Instances:Create("Frame", {
                         Parent = self.Window.Items["Content"].Instance,
@@ -2870,7 +2631,6 @@ do
                         Visible = false
                     })
 
-                    -- Barra de rolagem horizontal para os botões das sub-abas
                     self.SubTabBar = Instances:Create("ScrollingFrame", {
                         Parent = self.SubTabContainer.Instance,
                         Size = UDim2New(1, 0, 0, 36),
@@ -2895,12 +2655,10 @@ do
                         PaddingRight = UDimNew(0, 12)
                     })
 
-                    -- Ajuste dinâmico e preciso do tamanho do canvas
                     SubTabLayout.Instance:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
                         self.SubTabBar.Instance.CanvasSize = UDim2New(0, SubTabLayout.Instance.AbsoluteContentSize.X + 24, 0, 0)
                     end)
 
-                    -- Separador visual discreto sob a barra de abas
                     self.SubTabSeparator = Instances:Create("Frame", {
                         Parent = self.SubTabContainer.Instance,
                         Size = UDim2New(1, -24, 0, 1),
@@ -2909,7 +2667,6 @@ do
                         BorderSizePixel = 0
                     }):AddToTheme({BackgroundColor3 = "Outline"})
 
-                    -- Container isolado onde os ScrollingFrames de cada sub-aba ficarão
                     self.SubTabPagesContainer = Instances:Create("Frame", {
                         Parent = self.SubTabContainer.Instance,
                         Size = UDim2New(1, 0, 1, -50),
@@ -2918,7 +2675,6 @@ do
                     })
                 end
                 
-                -- Botão visual da Sub-Aba
                 local Button = Instances:Create("TextButton", {
                     Parent = self.SubTabBar.Instance,
                     Size = UDim2New(0, 0, 1, 0),
@@ -2935,7 +2691,6 @@ do
                 local stroke = Instances:Create("UIStroke", { Parent = Button.Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = "Outline"})
                 Instances:Create("UIPadding", { Parent = Button.Instance, PaddingLeft = UDimNew(0, 12), PaddingRight = UDimNew(0, 12) })
                 
-                -- ScrollingFrame exclusivo de conteúdo desta sub-aba
                 local SubPageFrame = Instances:Create("ScrollingFrame", {
                     Parent = self.SubTabPagesContainer.Instance,
                     Visible = false,
@@ -2960,25 +2715,21 @@ do
                 SubTab.Button = Button
                 SubTab.Stroke = stroke
                 
-                -- Função de alternância de estado visível (Sem bugs de transição ou offset)
                 function SubTab:Turn(Bool)
                     SubTab.Active = Bool
                     SubPageFrame.Instance.Visible = Bool
                     if Bool then
-                        -- Efeitos de transição ativa
                         TweenService:Create(Button.Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
                             BackgroundColor3 = Library.Theme.Accent,
                             TextColor3 = FromRGB(0, 0, 0)
                         }):Play()
                         stroke.Instance.Color = Library.Theme.Accent
                         
-                        -- Efeito sutil de subida suave ao entrar na aba
                         SubPageFrame.Instance.Position = UDim2New(0, 0, 0, 15)
                         TweenService:Create(SubPageFrame.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
                             Position = UDim2New(0, 0, 0, 0)
                         }):Play()
                     else
-                        -- Efeitos de transição inativa
                         TweenService:Create(Button.Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
                             BackgroundColor3 = Library.Theme.Inline,
                             TextColor3 = Library.Theme.Text
@@ -3014,10 +2765,10 @@ do
                     SubTab:Turn(true)
                 end
                 
-                -- Seção exclusiva vinculada à sub-aba
                 function SubTab:AddSection(Data)
                     Data = Data or {}
                     local Section = {
+                        ParentPage = self.Page,
                         Window = ParentPage.Window,
                         Page = ParentPage,
                         SubTab = SubTab,
@@ -3060,7 +2811,7 @@ do
             return setmetatable(Section, Library.Sections)
         end
 
-        -- TOGGLE
+        -- TOGGLE (AUTO-SAVE)
         Library.Sections.Toggle = function(self, Data)
             Data = Data or {}
 
@@ -3144,6 +2895,7 @@ do
                 TweenService:Create(Items["Indicator"].Instance, TweenInfo.new(0.2), {BackgroundColor3 = Value and Library.Theme.Accent or Library.Theme.Element}):Play()
                 Items["Text"].Instance.TextTransparency = Value and 0 or 0.5
                 Library:SafeCall(Toggle.Callback, Value)
+                Library:SaveAutosave()
             end
 
             function Toggle:AddKeybind(KeybindData)
@@ -3180,10 +2932,10 @@ do
                     if StringFind(tostring(Key), "Enum") then
                         local parsedKey = parseKey(tostring(Key))
                         if parsedKey == Library.ToggleKey then
-                            warn("⚠️ Conflito de tecla detectado com o atalho principal da GUI!")
+                            warn("⚠️ Conflito de tecla detectado!")
                             Library:Notify({
                                 Title = "Conflito de Teclas",
-                                Content = "Esta tecla já está associada ao atalho para abrir/fechar o menu!",
+                                Content = "Esta tecla já está associada ao atalho para fechar o menu!",
                                 Duration = 4,
                                 Type = "RISK"
                             })
@@ -3196,6 +2948,7 @@ do
                         Keybind.Value = TextToDisplay
                         KeyButton.Instance.Text = "["..TextToDisplay.."]"
                         Library.Flags[KBFlag] = Keybind.Key
+                        Library:SaveAutosave()
                     end
                 end
                 
@@ -3303,6 +3056,7 @@ do
             return Button
         end
 
+        -- SLIDER (AUTO-SAVE)
         Library.Sections.Slider = function(self, Data)
             Data = Data or {}
             local Slider = {
@@ -3350,6 +3104,7 @@ do
                 Items["Val"].Instance.Text = tostring(Clamped)
                 Library.Flags[Slider.Flag] = Clamped
                 Library:SafeCall(Slider.Callback, Clamped)
+                Library:SaveAutosave()
             end
 
             local function Update()
@@ -3410,7 +3165,7 @@ do
             return Slider 
         end
 
-        -- DROPDOWN
+        -- DROPDOWN (AUTO-SAVE)
         Library.Sections.Dropdown = function(self, Data)
             Data = Data or {}
             local Dropdown = {
@@ -3649,6 +3404,7 @@ do
                     Library:SafeCall(Dropdown.Callback, val)
                 end
                 updateMainDisplay()
+                Library:SaveAutosave()
             end
 
             function Dropdown:Refresh(newList)
@@ -3791,7 +3547,7 @@ do
             return Dropdown 
         end
 
-        -- CAIXA DE TEXTO (INPUT)
+        -- CAIXA DE TEXTO (AUTO-SAVE)
         Library.Sections.Input = function(self, Data)
             Data = Data or {}
             local Input = {
@@ -3853,6 +3609,7 @@ do
                 Items["TextBox"].Instance.Text = Value
                 Library.Flags[Input.Flag] = Value
                 Library:SafeCall(Input.Callback, Value)
+                Library:SaveAutosave()
             end
 
             function Input:Get() return Input.Value end
@@ -4076,6 +3833,7 @@ do
                     Parent = Items["Main"],
                     Flag = Colorpicker.Flag,
                     Default = Data.Default,
+                    Alpha = Data.Alpha,
                     Callback = Data.Callback,
                     Section = Colorpicker.Section
                 })
