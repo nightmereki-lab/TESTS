@@ -1,5 +1,3 @@
-
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -129,7 +127,6 @@ do
         }
     }
 
-    -- === SISTEMA DE REATIVIDADE (CORREÇÃO DEFINITIVA DE TIMING) ===
     setmetatable(Library.SetFlags, {
         __newindex = function(t, flag, setFunction)
             rawset(t, flag, setFunction)
@@ -172,8 +169,8 @@ do
         ["KeypadEight"] = "Keypad8", ["KeypadNine"] = "Keypad9", ["KeypadPeriod"] = "KeypadP", ["KeypadDivide"] = "KeypadD",
         ["KeypadMultiply"] = "KeypadM", ["KeypadMinus"] = "KeypadM", ["KeypadPlus"] = "KeypadP", ["KeypadEnter"] = "KeypadE",
         ["KeypadEquals"] = "KeypadE", ["Insert"] = "Insert", ["Home"] = "Home", ["PageUp"] = "PageUp",
-        ["PageDown"] = "PageDown", ["RightShift"] = "RightShift", ["LeftShift"] = "LeftShift", ["RightControl"] = "RightControl",
-        ["LeftControl"] = "LeftControl", ["LeftAlt"] = "LeftAlt", ["RightAlt"] = "RightAlt"
+        ["PageDown"] = "PageDown", ["RightShift"] = "RShift", ["LeftShift"] = "LShift", ["RightControl"] = "RCtrl",
+        ["LeftControl"] = "LCtrl", ["LeftAlt"] = "LAlt", ["RightAlt"] = "RAlt"
     }
 
     local Themes = {
@@ -1137,10 +1134,11 @@ do
         })
         Instances:Create("UICorner", {Parent = Items.AlphaGradientFrame.Instance, CornerRadius = UDimNew(0, 6)})
 
+        -- === FIX: NumSequence localzado lá no topo como NumberSequence.new ===
         Items.AlphaGradient = Instances:Create("UIGradient", {
             Parent = Items.AlphaGradientFrame.Instance,
             Rotation = 90,
-            Transparency = NumSequence.new(0, 1) 
+            Transparency = NumSequence(0, 1) 
         })
 
         Items.AlphaDragger = Instances:Create("Frame", {
