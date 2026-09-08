@@ -1,3 +1,4 @@
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -113,7 +114,7 @@ do
         NotifHolder = nil,
         UnusedHolder = nil,
         Font = nil,
-        Loaded = false, -- Controla se o carregamento inicial terminou
+        Loaded = false,
         
         CurrentPopupZIndex = 20000,
 
@@ -174,7 +175,7 @@ do
     end
 
     -- =========================================================================
-    -- CONFIGURAÇÃO PREVENTIVA DE MÉTODOS CORE (Evita "nil" ao instanciar botões)
+    -- CORE LIBRARY FUNCTIONS (Pre-defined for early element initialization)
     -- =========================================================================
     Library.Thread = function(self, Function)
         local NewThread = coroutine.create(Function)
@@ -256,7 +257,7 @@ do
 
     -- SILENT AUTO-SAVE
     Library.SaveAutosave = function(self)
-        if not self.Loaded then return end -- Retorna e não salva se ainda estiver inicializando os botões!
+        if not self.Loaded then return end 
         if not writefile then return end
         pcall(function()
             local rawData = self:GetConfig()
@@ -556,7 +557,40 @@ do
         end
     end
 
-    -- COLOR PICKER COM SUPORTE ALPHA COMPATÍVEL
+    -- INSTANCIAÇÃO PREVENTIVA DE SUPORTE GRÁFICO
+    Library.Holder = Instances:Create("ScreenGui", {
+        Parent = gethui(),
+        Name = "\0",
+        ZIndexBehavior = Enum.ZIndexBehavior.Global,
+        DisplayOrder = 2,
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true
+    })
+
+    Library.UnusedHolder = Instances:Create("ScreenGui", {
+        Parent = gethui(),
+        Name = "\0",
+        ZIndexBehavior = Enum.ZIndexBehavior.Global,
+        Enabled = false,
+        ResetOnSpawn = false
+    })
+
+    local NotifList = Instances:Create("Frame", {
+        Parent = Library.Holder.Instance,
+        Size = UDim2New(0, 320, 1, -60),
+        Position = UDim2New(1, -340, 0, 30),
+        BackgroundTransparency = 1,
+        ZIndex = 999999
+    })
+    Instances:Create("UIListLayout", {
+        Parent = NotifList.Instance,
+        Padding = UDimNew(0, 10),
+        VerticalAlignment = Enum.VerticalAlignment.Bottom,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        SortOrder = Enum.SortOrder.LayoutOrder
+    })
+
+    -- SELETOR DE CORES COM SUPORTE ALPHA
     Library.CreateColorpicker = function(self, Data)
         Data = Data or {}
 
@@ -1858,7 +1892,6 @@ do
                 Window.Items = Items
             end
 
-            -- NOVO ADDPAGE SEM O BOTÃO DE IMPORTAR DO CLIPBOARD
             function Window:AddConfigPage()
                 if not self or not self.Items then return end
 
@@ -3462,6 +3495,121 @@ do
         end
     end
 
+    -- SISTEMA DE NOTIFICAÇÕES E UNLOAD
+    local NotifList = Instances:Create("Frame", {
+        Parent = Library.Holder.Instance,
+        Size = UDim2New(0, 320, 1, -60),
+        Position = UDim2New(1, -340, 0, 30),
+        BackgroundTransparency = 1,
+        ZIndex = 999999
+    })
+    Instances:Create("UIListLayout", {
+        Parent = NotifList.Instance,
+        Padding = UDimNew(0, 10),
+        VerticalAlignment = Enum.VerticalAlignment.Bottom,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        SortOrder = Enum.SortOrder.LayoutOrder
+    })
+
+    function Library:Notify(NotificationConfig)
+        NotificationConfig = NotificationConfig or {}
+        local Name = NotificationConfig.Name or NotificationConfig.Title or "Notification"
+        local Content = NotificationConfig.Content or NotificationConfig.Text or "Test"
+        local Image = NotificationConfig.Image or "rbxassetid://4384403532"
+        local Time = NotificationConfig.Time or NotificationConfig.Duration or 15
+
+        task.spawn(function()
+            local NotificationParent = Instances:Create("Frame", {
+                Size = UDim2New(1, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                BackgroundTransparency = 1,
+                Parent = NotifList.Instance
+            })
+
+            local NotificationFrame = Instances:Create("Frame", {
+                Parent = NotificationParent.Instance, 
+                Size = UDim2New(1, 0, 0, 0),
+                Position = UDim2New(1, -55, 0, 0),
+                BackgroundColor3 = FromRGB(255, 255, 255),
+                BackgroundTransparency = 0,
+                AutomaticSize = Enum.AutomaticSize.Y
+            })
+            NotificationFrame.Instance.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+            Instances:Create("UICorner", { Parent = NotificationFrame.Instance, CornerRadius = UDimNew(0, 10) })
+            
+            local UIStroke = Instances:Create("UIStroke", {
+                Parent = NotificationFrame.Instance,
+                Color = FromRGB(93, 93, 93),
+                Thickness = 1.2
+            })
+            
+            Instances:Create("UIPadding", {
+                Parent = NotificationFrame.Instance,
+                PaddingTop = UDimNew(0, 12),
+                PaddingBottom = UDimNew(0, 12),
+                PaddingLeft = UDimNew(0, 12),
+                PaddingRight = UDimNew(0, 12)
+            })
+
+            local Icon = Instances:Create("ImageLabel", {
+                Parent = NotificationFrame.Instance,
+                Size = UDim2New(0, 20, 0, 20),
+                Image = Image,
+                ImageColor3 = FromRGB(240, 240, 240),
+                BackgroundTransparency = 1,
+                Name = "Icon"
+            })
+
+            local Title = Instances:Create("TextLabel", {
+                Parent = NotificationFrame.Instance,
+                Size = UDim2New(1, -30, 0, 20),
+                Position = UDim2New(0, 30, 0, 0),
+                Text = Name,
+                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
+                TextSize = 15,
+                TextColor3 = FromRGB(255, 255, 255),
+                BackgroundTransparency = 1,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Name = "Title"
+            })
+
+            local ContentLabel = Instances:Create("TextLabel", {
+                Parent = NotificationFrame.Instance,
+                Size = UDim2New(1, 0, 0, 0),
+                Position = UDim2New(0, 0, 0, 25),
+                Text = Content,
+                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                TextSize = 14,
+                TextColor3 = FromRGB(200, 200, 200),
+                BackgroundTransparency = 1,
+                TextWrapped = true,
+                AutomaticSize = Enum.AutomaticSize.Y,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Name = "Content"
+            })
+
+            TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2New(0, 0, 0, 0)}):Play()
+
+            task_wait(Time - 0.88)
+            TweenService:Create(Icon.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 1}):Play()
+            TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.8, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.6}):Play()
+            task_wait(0.3)
+            TweenService:Create(UIStroke.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {Transparency = 0.9}):Play()
+            TweenService:Create(Title.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {TextTransparency = 0.4}):Play()
+            TweenService:Create(ContentLabel.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {TextTransparency = 0.5}):Play()
+            task_wait(0.05)
+
+            local exitTween = TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Position = UDim2New(1, 20, 0, 0)})
+            exitTween:Play()
+            task_wait(1.35)
+            NotificationParent:Clean()
+        end)
+    end
+
+    function Library:MakeNotification(NotificationConfig)
+        self:Notify(NotificationConfig)
+    end
+
     Library.Unload = function(self)
         for _, Value in pairs(self.Connections) do 
             if Value.Connection then Value.Connection:Disconnect() end
@@ -3471,6 +3619,11 @@ do
         end
         if self.Holder then 
             self.Holder:Clean()
+            self.Holder = nil
+        end
+        if self.UnusedHolder then
+            self.UnusedHolder:Clean()
+            self.UnusedHolder = nil
         end
 
         local lighting = game:GetService("Lighting")
@@ -3478,7 +3631,6 @@ do
         if blur then blur:Destroy() end
 
         TableClear(activeTweens)
-        Library = nil 
         getgenv().Library = nil
     end
 
