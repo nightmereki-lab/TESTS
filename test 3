@@ -113,6 +113,7 @@ do
         NotifHolder = nil,
         UnusedHolder = nil,
         Font = nil,
+        Loaded = false, -- Controla se o carregamento inicial terminou
         
         CurrentPopupZIndex = 20000,
 
@@ -170,6 +171,151 @@ do
                 makefolder(Value)
             end
         end
+    end
+
+    -- =========================================================================
+    -- CONFIGURAÇÃO PREVENTIVA DE MÉTODOS CORE (Evita "nil" ao instanciar botões)
+    -- =========================================================================
+    Library.Thread = function(self, Function)
+        local NewThread = coroutine.create(Function)
+        coroutine.wrap(function()
+            coroutine.resume(NewThread)
+        end)()
+        TableInsert(self.Threads, NewThread)
+        return NewThread
+    end
+    
+    Library.SafeCall = function(self, Function, ...)
+        if typeof(Function) == "function" then
+            local Success, Result = pcall(Function, ...)
+            if not Success then
+                warn(Result)
+                return false
+            end
+            return Success
+        end
+        return false
+    end
+
+    Library.Connect = function(self, Event, Callback, Name)
+        self.UnnamedConnections = self.UnnamedConnections + 1
+        Name = Name or StringFormat("connection_number_%s_%s", self.UnnamedConnections, HttpService:GenerateGUID(false))
+
+        local NewConnection = {
+            Event = Event,
+            Callback = Callback,
+            Name = Name,
+            Connection = nil
+        }
+
+        Library:Thread(function()
+            NewConnection.Connection = Event:Connect(Callback)
+        end)
+
+        TableInsert(self.Connections, NewConnection)
+        return NewConnection
+    end
+
+    Library.Disconnect = function(self, Name)
+        for _, Connection in ipairs(self.Connections) do 
+            if Connection.Name == Name then
+                if Connection.Connection then Connection.Connection:Disconnect() end
+                break
+            end
+        end
+    end
+
+    Library.NextFlag = function(self)
+        self.UnnamedFlags = self.UnnamedFlags + 1
+        return StringFormat("flag_number_%s_%s", self.UnnamedFlags, HttpService:GenerateGUID(false))
+    end
+
+    Library.AddToTheme = function(self, Item, Properties)
+        Item = Item.Instance or Item 
+
+        local ThemeData = {
+            Item = Item,
+            Properties = Properties,
+        }
+
+        for Property, Value in pairs(ThemeData.Properties) do
+            if type(Value) == "string" then
+                Item[Property] = self.Theme[Value] or Value
+            else
+                Item[Property] = Value()
+            end
+        end
+
+        TableInsert(self.ThemeItems, ThemeData)
+        self.ThemeMap[Item] = ThemeData
+    end
+
+    Library.ToRich = function(self, Text, Color)
+        return StringFormat('<font color="rgb(%s, %s, %s)">%s</font>', MathFloor(Color.R * 255), MathFloor(Color.G * 255), MathFloor(Color.B * 255), Text)
+    end
+
+    -- SILENT AUTO-SAVE
+    Library.SaveAutosave = function(self)
+        if not self.Loaded then return end -- Retorna e não salva se ainda estiver inicializando os botões!
+        if not writefile then return end
+        pcall(function()
+            local rawData = self:GetConfig()
+            writefile("midnight_lib/autosave.json", rawData)
+        end)
+    end
+
+    Library.GetConfig = function(self)
+        local Config = {} 
+        Library:SafeCall(function()
+            for Index, Value in pairs(Library.Flags) do 
+                if type(Value) == "table" and Value.Key then
+                    Config[Index] = {Key = tostring(Value.Key), Mode = Value.Mode}
+                elseif type(Value) == "table" and Value.Color then
+                    Config[Index] = {Color = "#" .. Value.HexValue, Alpha = Value.Alpha}
+                else
+                    Config[Index] = Value
+                end
+            end
+        end)
+        return HttpService:JSONEncode(Config)
+    end
+
+    Library.LoadConfig = function(self, Config)
+        local Decoded = HttpService:JSONDecode(Config)
+        local Success, Result = Library:SafeCall(function()
+            for Index, Value in pairs(Decoded) do 
+                local SetFunction = Library.SetFlags[Index]
+                if SetFunction then
+                    if type(Value) == "table" and Value.Key then 
+                        SetFunction(Value)
+                    elseif type(Value) == "table" and Value.Color then
+                        SetFunction(Value.Color, Value.Alpha)
+                    else
+                        SetFunction(Value)
+                    end
+                end
+            end
+        end)
+        return Success, Result
+    end
+
+    Library.IsMouseOverFrame = function(self, Frame)
+        Frame = Frame.Instance or Frame
+        local MousePosition = Vector2New(Mouse.X, Mouse.Y)
+        return MousePosition.X >= Frame.AbsolutePosition.X and MousePosition.X <= Frame.AbsolutePosition.X + Frame.AbsoluteSize.X 
+        and MousePosition.Y >= Frame.AbsolutePosition.Y and MousePosition.Y <= Frame.AbsolutePosition.Y + Frame.AbsoluteSize.Y
+    end
+
+    Library.CompareVectors = function(self, PointA, PointB)
+        return (PointA.X < PointB.X) or (PointA.Y < PointB.Y)
+    end
+
+    Library.IsClipped = function(self, Object, Column)
+        local BoundryTop = Column.AbsolutePosition
+        local BoundryBottom = BoundryTop + Column.AbsoluteSize
+        local Top = Object.AbsolutePosition
+        local Bottom = Top + Object.AbsoluteSize 
+        return Library:CompareVectors(Top, BoundryTop) or Library:CompareVectors(BoundryBottom, Bottom)
     end
 
     local activeTweens = {}
@@ -410,513 +556,7 @@ do
         end
     end
 
-    local CustomFont = {} do
-        function CustomFont:New(Name, Weight, Style, Data)
-            local success, fontObj = pcall(function()
-                if writefile and readfile and isfile and getcustomasset then
-                    if not isfile(Data.Id) then 
-                        local httpSuccess, response = pcall(function()
-                            return game:HttpGet(Data.Url, true)
-                        end)
-                        if httpSuccess and response then
-                            writefile(Data.Id, response)
-                        else
-                            error("Download da fonte falhou.")
-                        end
-                    end
-
-                    local FontData = {
-                        name = Name,
-                        faces = {
-                            {
-                                name = Name,
-                                weight = Weight,
-                                style = Style,
-                                assetId = getcustomasset(Data.Id)
-                            }
-                        }
-                    }
-
-                    writefile(StringFormat("%s/%s.font", Library.Folders.Assets, Name), HttpService:JSONEncode(FontData))
-                    return Font.new(getcustomasset(StringFormat("%s/%s.font", Library.Folders.Assets, Name)))
-                end
-            end)
-            if success and fontObj then
-                return fontObj
-            end
-            return Font.fromEnum(Enum.Font.SourceSans)
-        end
-
-        Library.Font = CustomFont:New("OutfitMedium", 400, "Regular", {
-            Id = "OutfitMedium",
-            Url = "https://github.com/sametexe001/luas/raw/refs/heads/main/fonts/Outfit-Medium.ttf"
-        })
-    end
-
-    function Library:CreateInfoPopup(Title, Description, BadgeType)
-        local BadgeColor = Library.BadgeColors[BadgeType] or Library.Theme.Accent
-        
-        Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 20
-        local baseZIndex = Library.CurrentPopupZIndex
-
-        local Blur = Instance.new("BlurEffect")
-        Blur.Name = "Midnight_BadgeBlur"
-        Blur.Size = 0
-        Blur.Parent = game:GetService("Lighting")
-        TweenService:Create(Blur, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = 16}):Play()
-
-        local Overlay = Instances:Create("TextButton", {
-            Parent = Library.Holder.Instance,
-            Size = UDim2New(1, 0, 1, 0),
-            BackgroundColor3 = FromRGB(8, 8, 10),
-            BackgroundTransparency = 1,
-            Text = "",
-            Active = true,
-            AutoButtonColor = false,
-            ZIndex = baseZIndex
-        })
-
-        local Container = Instances:Create("Frame", {
-            Parent = Overlay.Instance,
-            AnchorPoint = Vector2New(0.5, 0.5),
-            Position = UDim2New(0.5, 0, 0.45, 0),
-            Size = UDim2New(0, 360, 0, 240),
-            BackgroundColor3 = Library.Theme.Background,
-            BorderSizePixel = 0,
-            ZIndex = baseZIndex + 1,
-            ClipsDescendants = true
-        })
-        Instances:Create("UICorner", { Parent = Container.Instance, CornerRadius = UDimNew(0, 10) })
-        Instances:Create("UIStroke", { Parent = Container.Instance, Color = BadgeColor, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Transparency = 0.1 })
-
-        local Glow = Instances:Create("ImageLabel", {
-            Parent = Container.Instance,
-            Size = UDim2New(1, 40, 1, 40),
-            Position = UDim2New(0.5, 0, 0.5, 0),
-            AnchorPoint = Vector2New(0.5, 0.5),
-            BackgroundTransparency = 1,
-            Image = "rbxassetid://13110323315",
-            ImageColor3 = BadgeColor,
-            ImageTransparency = 0.85,
-            ZIndex = baseZIndex
-        })
-
-        local Header = Instances:Create("TextLabel", {
-            Parent = Container.Instance,
-            Text = StringFormat("[%s] - %s", BadgeType, Title),
-            FontFace = Library.Font,
-            TextColor3 = BadgeColor,
-            TextSize = 18,
-            Size = UDim2New(1, 0, 0, 50),
-            BackgroundTransparency = 1,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            ZIndex = baseZIndex + 2
-        })
-
-        local Separator = Instances:Create("Frame", {
-            Parent = Container.Instance,
-            Size = UDim2New(0.85, 0, 0, 1),
-            Position = UDim2New(0.075, 0, 0, 50),
-            BackgroundColor3 = BadgeColor,
-            BackgroundTransparency = 0.6,
-            BorderSizePixel = 0,
-            ZIndex = baseZIndex + 2
-        })
-
-        local Desc = Instances:Create("TextLabel", {
-            Parent = Container.Instance,
-            Text = Description or "Sem detalhes adicionais disponíveis.",
-            FontFace = Library.Font,
-            TextColor3 = Library.Theme.Text,
-            TextSize = 14,
-            Position = UDim2New(0, 25, 0, 65),
-            Size = UDim2New(1, -50, 1, -135),
-            BackgroundTransparency = 1,
-            TextWrapped = true,
-            TextYAlignment = Enum.TextYAlignment.Top,
-            ZIndex = baseZIndex + 2
-        })
-
-        local Close = Instances:Create("TextButton", {
-            Parent = Container.Instance,
-            Text = "COMPREENDIDO",
-            FontFace = Library.Font,
-            TextColor3 = FromRGB(255, 255, 255),
-            BackgroundColor3 = BadgeColor,
-            Active = true,
-            Size = UDim2New(0, 140, 0, 36),
-            Position = UDim2New(0.5, -70, 1, -50),
-            BorderSizePixel = 0,
-            ZIndex = baseZIndex + 3
-        })
-        Instances:Create("UICorner", { Parent = Close.Instance, CornerRadius = UDimNew(0, 6) })
-
-        Container.Instance.Size = UDim2New(0, 252, 0, 168)
-        TweenService:Create(Overlay.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.65}):Play()
-        TweenService:Create(Container.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 360, 0, 240), Position = UDim2New(0.5, 0, 0.5, 0)}):Play()
-
-        Close:Connect("MouseEnter", function()
-            TweenService:Create(Close.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BadgeColor:Lerp(Color3.new(1, 1, 1), 0.15)}):Play()
-        end)
-        Close:Connect("MouseLeave", function()
-            TweenService:Create(Close.Instance, TweenInfo.new(0.15), {BackgroundColor3 = BadgeColor}):Play()
-        end)
-
-        Close:Connect("MouseButton1Click", function()
-            TweenService:Create(Overlay.Instance, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
-            TweenService:Create(Blur, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = 0}):Play()
-            local T = TweenService:Create(Container.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2New(0, 0, 0, 0), Position = UDim2New(0.5, 0, 0.55, 0)})
-            T:Play()
-            T.Completed:Connect(function() 
-                Overlay:Clean() 
-                if Blur then Blur:Destroy() end
-            end)
-        end)
-    end
-
-    function Library:CreateBadge(Parent, Data)
-        if not Data or not Data.Badge then return end
-        
-        local BType = Data.Badge:upper()
-        local BColor = Library.BadgeColors[BType] or Library.Theme.Accent
-        local BDesc = BadgeDescriptions[BType] or Data.BadgeDescription or "Sem detalhes adicionais sobre esta tag."
-        
-        local Badge = Instances:Create("TextButton", {
-            Parent = Parent,
-            Text = BType,
-            FontFace = Library.Font,
-            TextSize = 10,
-            TextColor3 = BColor,
-            BackgroundColor3 = BColor,
-            BackgroundTransparency = 0.85,
-            Active = true,
-            Size = UDim2New(0, 42, 0, 16),
-            Position = UDim2New(0, Parent.TextBounds.X + 10, 0.5, -8),
-            BorderSizePixel = 0,
-            AutoButtonColor = false
-        })
-        Instances:Create("UICorner", { Parent = Badge.Instance, CornerRadius = UDimNew(0, 4) })
-        
-        local stroke = Instances:Create("UIStroke", {
-            Parent = Badge.Instance,
-            Color = BColor,
-            Transparency = 0.6,
-            Thickness = 1,
-            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        })
-
-        Badge:Connect("MouseEnter", function()
-            TweenService:Create(Badge.Instance, TweenInfo.new(0.15), {BackgroundTransparency = 0.7}):Play()
-            TweenService:Create(stroke.Instance, TweenInfo.new(0.15), {Transparency = 0.2}):Play()
-        end)
-        Badge:Connect("MouseLeave", function()
-            TweenService:Create(Badge.Instance, TweenInfo.new(0.15), {BackgroundTransparency = 0.85}):Play()
-            TweenService:Create(stroke.Instance, TweenInfo.new(0.15), {Transparency = 0.6}):Play()
-        end)
-        
-        local function updatePos()
-            if Parent and Parent.Parent then
-                Badge.Instance.Position = UDim2New(0, Parent.TextBounds.X + 10, 0.5, -8)
-            end
-        end
-        local textBoundsConnection = Parent:GetPropertyChangedSignal("TextBounds"):Connect(updatePos)
-        
-        Library:Connect(Parent.Destroying, function()
-            if textBoundsConnection then
-                textBoundsConnection:Disconnect()
-            end
-        end)
-        updatePos()
-        
-        Badge:Connect("MouseButton1Click", function()
-            Library:CreateInfoPopup(Data.Name or "Informação", BDesc, BType)
-        end)
-        
-        return Badge
-    end
-
-    Library.Holder = Instances:Create("ScreenGui", {
-        Parent = gethui(),
-        Name = "\0",
-        ZIndexBehavior = Enum.ZIndexBehavior.Global,
-        DisplayOrder = 2,
-        ResetOnSpawn = false,
-        IgnoreGuiInset = true
-    })
-
-    Library.UnusedHolder = Instances:Create("ScreenGui", {
-        Parent = gethui(),
-        Name = "\0",
-        ZIndexBehavior = Enum.ZIndexBehavior.Global,
-        Enabled = false,
-        ResetOnSpawn = false
-    })
-
-    local NotifList = Instances:Create("Frame", {
-        Parent = Library.Holder.Instance,
-        Size = UDim2New(0, 320, 1, -60),
-        Position = UDim2New(1, -340, 0, 30),
-        BackgroundTransparency = 1,
-        ZIndex = 999999
-    })
-    Instances:Create("UIListLayout", {
-        Parent = NotifList.Instance,
-        Padding = UDimNew(0, 10),
-        VerticalAlignment = Enum.VerticalAlignment.Bottom,
-        HorizontalAlignment = Enum.HorizontalAlignment.Right,
-        SortOrder = Enum.SortOrder.LayoutOrder
-    })
-
-    function Library:Notify(NotificationConfig)
-        NotificationConfig = NotificationConfig or {}
-        local Name = NotificationConfig.Name or NotificationConfig.Title or "Notification"
-        local Content = NotificationConfig.Content or NotificationConfig.Text or "Test"
-        local Image = NotificationConfig.Image or "rbxassetid://4384403532"
-        local Time = NotificationConfig.Time or NotificationConfig.Duration or 15
-
-        task.spawn(function()
-            local NotificationParent = Instances:Create("Frame", {
-                Size = UDim2New(1, 0, 0, 0),
-                AutomaticSize = Enum.AutomaticSize.Y,
-                BackgroundTransparency = 1,
-                Parent = NotifList.Instance
-            })
-
-            local NotificationFrame = Instances:Create("Frame", {
-                Parent = NotificationParent.Instance, 
-                Size = UDim2New(1, 0, 0, 0),
-                Position = UDim2New(1, -55, 0, 0),
-                BackgroundColor3 = FromRGB(255, 255, 255),
-                BackgroundTransparency = 0,
-                AutomaticSize = Enum.AutomaticSize.Y
-            })
-            NotificationFrame.Instance.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-            Instances:Create("UICorner", { Parent = NotificationFrame.Instance, CornerRadius = UDimNew(0, 10) })
-            
-            local UIStroke = Instances:Create("UIStroke", {
-                Parent = NotificationFrame.Instance,
-                Color = FromRGB(93, 93, 93),
-                Thickness = 1.2
-            })
-            
-            Instances:Create("UIPadding", {
-                Parent = NotificationFrame.Instance,
-                PaddingTop = UDimNew(0, 12),
-                PaddingBottom = UDimNew(0, 12),
-                PaddingLeft = UDimNew(0, 12),
-                PaddingRight = UDimNew(0, 12)
-            })
-
-            local Icon = Instances:Create("ImageLabel", {
-                Parent = NotificationFrame.Instance,
-                Size = UDim2New(0, 20, 0, 20),
-                Image = Image,
-                ImageColor3 = FromRGB(240, 240, 240),
-                BackgroundTransparency = 1,
-                Name = "Icon"
-            })
-
-            local Title = Instances:Create("TextLabel", {
-                Parent = NotificationFrame.Instance,
-                Size = UDim2New(1, -30, 0, 20),
-                Position = UDim2New(0, 30, 0, 0),
-                Text = Name,
-                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
-                TextSize = 15,
-                TextColor3 = FromRGB(255, 255, 255),
-                BackgroundTransparency = 1,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                Name = "Title"
-            })
-
-            local ContentLabel = Instances:Create("TextLabel", {
-                Parent = NotificationFrame.Instance,
-                Size = UDim2New(1, 0, 0, 0),
-                Position = UDim2New(0, 0, 0, 25),
-                Text = Content,
-                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
-                TextSize = 14,
-                TextColor3 = FromRGB(200, 200, 200),
-                BackgroundTransparency = 1,
-                TextWrapped = true,
-                AutomaticSize = Enum.AutomaticSize.Y,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                Name = "Content"
-            })
-
-            TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2New(0, 0, 0, 0)}):Play()
-
-            task_wait(Time - 0.88)
-            TweenService:Create(Icon.Instance, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 1}):Play()
-            TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.8, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.6}):Play()
-            task_wait(0.3)
-            TweenService:Create(UIStroke.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {Transparency = 0.9}):Play()
-            TweenService:Create(Title.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {TextTransparency = 0.4}):Play()
-            TweenService:Create(ContentLabel.Instance, TweenInfo.new(0.6, Enum.EasingStyle.Quint), {TextTransparency = 0.5}):Play()
-            task_wait(0.05)
-
-            local exitTween = TweenService:Create(NotificationFrame.Instance, TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Position = UDim2New(1, 20, 0, 0)})
-            exitTween:Play()
-            task_wait(1.35)
-            NotificationParent:Clean()
-        end)
-    end
-
-    function Library:MakeNotification(NotificationConfig)
-        self:Notify(NotificationConfig)
-    end
-
-    Library.Unload = function(self)
-        for _, Value in pairs(self.Connections) do 
-            if Value.Connection then Value.Connection:Disconnect() end
-        end
-        for _, Value in pairs(self.Threads) do 
-            coroutine.close(Value)
-        end
-        if self.Holder then 
-            self.Holder:Clean()
-        end
-
-        local lighting = game:GetService("Lighting")
-        local blur = lighting:FindFirstChild("Midnight_BadgeBlur")
-        if blur then blur:Destroy() end
-
-        TableClear(activeTweens)
-        Library = nil 
-        getgenv().Library = nil
-    end
-
-    Library.Round = function(self, Number, Float)
-        if not Float or Float <= 0 then
-            return MathFloor(Number + 0.5)
-        end
-        local Multiplier = 1 / Float
-        return MathFloor(Number * Multiplier) / Multiplier
-    end
-
-    Library.Thread = function(self, Function)
-        local NewThread = coroutine.create(Function)
-        coroutine.wrap(function()
-            coroutine.resume(NewThread)
-        end)()
-        TableInsert(self.Threads, NewThread)
-        return NewThread
-    end
-    
-    Library.SafeCall = function(self, Function, ...)
-        if typeof(Function) == "function" then
-            local Success, Result = pcall(Function, ...)
-            if not Success then
-                warn(Result)
-                return false
-            end
-            return Success
-        end
-        return false
-    end
-
-    Library.Connect = function(self, Event, Callback, Name)
-        self.UnnamedConnections = self.UnnamedConnections + 1
-        Name = Name or StringFormat("connection_number_%s_%s", self.UnnamedConnections, HttpService:GenerateGUID(false))
-
-        local NewConnection = {
-            Event = Event,
-            Callback = Callback,
-            Name = Name,
-            Connection = nil
-        }
-
-        Library:Thread(function()
-            NewConnection.Connection = Event:Connect(Callback)
-        end)
-
-        TableInsert(self.Connections, NewConnection)
-        return NewConnection
-    end
-
-    Library.Disconnect = function(self, Name)
-        for _, Connection in ipairs(self.Connections) do 
-            if Connection.Name == Name then
-                if Connection.Connection then Connection.Connection:Disconnect() end
-                break
-            end
-        end
-    end
-
-    Library.NextFlag = function(self)
-        self.UnnamedFlags = self.UnnamedFlags + 1
-        return StringFormat("flag_number_%s_%s", self.UnnamedFlags, HttpService:GenerateGUID(false))
-    end
-
-    Library.AddToTheme = function(self, Item, Properties)
-        Item = Item.Instance or Item 
-
-        local ThemeData = {
-            Item = Item,
-            Properties = Properties,
-        }
-
-        for Property, Value in pairs(ThemeData.Properties) do
-            if type(Value) == "string" then
-                Item[Property] = self.Theme[Value] or Value
-            else
-                Item[Property] = Value()
-            end
-        end
-
-        TableInsert(self.ThemeItems, ThemeData)
-        self.ThemeMap[Item] = ThemeData
-    end
-
-    Library.ToRich = function(self, Text, Color)
-        return StringFormat('<font color="rgb(%s, %s, %s)">%s</font>', MathFloor(Color.R * 255), MathFloor(Color.G * 255), MathFloor(Color.B * 255), Text)
-    end
-
-    -- METODO SILENCIOSO DE AUTO-SAVE
-    Library.SaveAutosave = function(self)
-        if not writefile then return end
-        pcall(function()
-            local rawData = self:GetConfig()
-            writefile("midnight_lib/autosave.json", rawData)
-        end)
-    end
-
-    Library.GetConfig = function(self)
-        local Config = {} 
-        Library:SafeCall(function()
-            for Index, Value in pairs(Library.Flags) do 
-                if type(Value) == "table" and Value.Key then
-                    Config[Index] = {Key = tostring(Value.Key), Mode = Value.Mode}
-                elseif type(Value) == "table" and Value.Color then
-                    Config[Index] = {Color = "#" .. Value.HexValue, Alpha = Value.Alpha}
-                else
-                    Config[Index] = Value
-                end
-            end
-        end)
-        return HttpService:JSONEncode(Config)
-    end
-
-    Library.LoadConfig = function(self, Config)
-        local Decoded = HttpService:JSONDecode(Config)
-        local Success, Result = Library:SafeCall(function()
-            for Index, Value in pairs(Decoded) do 
-                local SetFunction = Library.SetFlags[Index]
-                if SetFunction then
-                    if type(Value) == "table" and Value.Key then 
-                        SetFunction(Value)
-                    elseif type(Value) == "table" and Value.Color then
-                        SetFunction(Value.Color, Value.Alpha)
-                    else
-                        SetFunction(Value)
-                    end
-                end
-            end
-        end)
-        return Success, Result
-    end
-
-    -- SELETOR DE CORES COM SUPORTE ALPHA
+    -- COLOR PICKER COM SUPORTE ALPHA COMPATÍVEL
     Library.CreateColorpicker = function(self, Data)
         Data = Data or {}
 
@@ -2218,7 +1858,7 @@ do
                 Window.Items = Items
             end
 
-            -- NOVO ADDPAGE TOTALMENTE SIMPLIFICADO (SEM THEME, SEM TELEPORT, SÓ CLIPBOARD UNIVERSAL)
+            -- NOVO ADDPAGE SEM O BOTÃO DE IMPORTAR DO CLIPBOARD
             function Window:AddConfigPage()
                 if not self or not self.Items then return end
 
@@ -2286,48 +1926,6 @@ do
                     end
                 })
 
-                -- Método: Ler Código da área de transferência e aplicar em tempo real
-                ShareSec:AddButton({
-                    Name = "Importar do Clipboard e Aplicar",
-                    Callback = function()
-                        if not getclipboard then
-                            Library:Notify({Title = "Não Suportado", Content = "Seu executor não suporta ler a área de transferência.", Duration = 4, Type = "RISK"})
-                            return
-                        end
-
-                        local ok, text = pcall(getclipboard)
-                        if ok and text and text ~= "" then
-                            local loadOk, fn = pcall(loadstring, text)
-                            if loadOk and fn then
-                                local runOk, err = pcall(fn)
-                                if runOk and type(getgenv().MidnightConfig) == "table" then
-                                    for flagName, flagValue in pairs(getgenv().MidnightConfig) do
-                                        local SetFunction = Library.SetFlags[flagName]
-                                        if SetFunction then
-                                            if type(flagValue) == "table" and flagValue.Color then
-                                                SetFunction(flagValue.Color, flagValue.Alpha)
-                                            else
-                                                SetFunction(flagValue)
-                                            end
-                                        end
-                                    end
-                                    Library:SaveAutosave()
-                                    Library:Notify({
-                                        Title = "Importado",
-                                        Content = "Configurações importadas e aplicadas!",
-                                        Duration = 4,
-                                        Type = "SAFE"
-                                    })
-                                    return
-                                end
-                            end
-                            Library:Notify({Title = "Erro ao Importar", Content = "Texto da área de transferência inválido ou incompatível.", Duration = 4, Type = "BUG"})
-                        else
-                            Library:Notify({Title = "Área Vazia", Content = "Área de transferência vazia.", Duration = 4, Type = "BUG"})
-                        end
-                    end
-                })
-
                 -- SEÇÃO: ATALHO DO MENU
                 local GuiSec = ConfigPage:AddSection({Name = "Atalho do Menu"})
 
@@ -2384,7 +1982,7 @@ do
                     Window:AddConfigPage()
                     
                     local loaded = false
-                    -- CARREGAMENTO AUTOMÁTICO VIA GETGENV (Se definido antes da lib rodar)
+                    -- CARREGAMENTO AUTOMÁTICO VIA GETGENV
                     if type(getgenv().MidnightConfig) == "table" then
                         local success = pcall(function()
                             for flagName, flagValue in pairs(getgenv().MidnightConfig) do
@@ -2409,7 +2007,7 @@ do
                         end
                     end
 
-                    -- CARREGAMENTO AUTOMÁTICO VIA ARQUIVO DE AUTO-SALVAMENTO LOCAL (Se nenhum getgenv foi definido)
+                    -- CARREGAMENTO AUTOMÁTICO VIA ARQUIVO LOCAL
                     if not loaded and isfile and readfile and isfile("midnight_lib/autosave.json") then
                         local success, content = pcall(readfile, "midnight_lib/autosave.json")
                         if success and content then
@@ -2424,6 +2022,9 @@ do
                             end
                         end
                     end
+
+                    -- Permite que novas interações gravem arquivos de Auto-Save de agora em diante!
+                    Library.Loaded = true
                 end
             end)
 
@@ -3859,6 +3460,34 @@ do
             Label.Section.Window:RegisterElement(l.Instance, "Label", Label.Text, Label.Section, Label.Section.Page)
             return Label
         end
+    end
+
+    Library.Unload = function(self)
+        for _, Value in pairs(self.Connections) do 
+            if Value.Connection then Value.Connection:Disconnect() end
+        end
+        for _, Value in pairs(self.Threads) do 
+            coroutine.close(Value)
+        end
+        if self.Holder then 
+            self.Holder:Clean()
+        end
+
+        local lighting = game:GetService("Lighting")
+        local blur = lighting:FindFirstChild("Midnight_BadgeBlur")
+        if blur then blur:Destroy() end
+
+        TableClear(activeTweens)
+        Library = nil 
+        getgenv().Library = nil
+    end
+
+    Library.Round = function(self, Number, Float)
+        if not Float or Float <= 0 then
+            return MathFloor(Number + 0.5)
+        end
+        local Multiplier = 1 / Float
+        return MathFloor(Number * Multiplier) / Multiplier
     end
 
     function Library:CreateWindow(Data) return self:Window(Data) end
