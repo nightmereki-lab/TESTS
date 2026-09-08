@@ -904,11 +904,18 @@ do
         return StringFormat('<font color="rgb(%s, %s, %s)">%s</font>', MathFloor(Color.R * 255), MathFloor(Color.G * 255), MathFloor(Color.B * 255), Text)
     end
 
+    -- Debounce: evita writefile centenas de vezes por segundo ao arrastar Slider/Colorpicker
+    local autosavePending = false
     Library.SaveAutosave = function(self)
         if not writefile then return end
-        pcall(function()
-            local rawData = self:GetConfig()
-            writefile("midnight_lib/autosave.json", rawData)
+        if autosavePending then return end
+        autosavePending = true
+        task.delay(0.3, function()
+            autosavePending = false
+            pcall(function()
+                local rawData = self:GetConfig()
+                writefile("midnight_lib/autosave.json", rawData)
+            end)
         end)
     end
 
@@ -2306,7 +2313,7 @@ do
             
             ShareSec:AddParagraph({
                 Title = "Auto-Save Automático",
-                Content = "• Suas alterações são salvas automaticamente a cada clique.\n• O carregamento do arquivo local ocorre sozinho ao iniciar o script.",
+                Content = "• Suas alterações são salvas automaticamente a cada clique.\n• O carregamento do arquivo local ocorre sozinho ao iniciar o script.\n• Você também pode definir getgenv().MidnightConfig antes de executar a lib.",
                 Icon = "rbxassetid://11419114175"
             })
 
@@ -2359,47 +2366,6 @@ do
                         })
                     else
                         Library:Notify({Title = "Erro", Content = "Falha ao copiar: " .. tostring(err), Duration = 4, Type = "BUG"})
-                    end
-                end
-            })
-
-            ShareSec:AddButton({
-                Name = "Importar do Clipboard e Aplicar",
-                Callback = function()
-                    if not getclipboard then
-                        Library:Notify({Title = "Não Suportado", Content = "Seu executor não suporta ler a área de transferência.", Duration = 4, Type = "RISK"})
-                        return
-                    end
-
-                    local ok, text = pcall(getclipboard)
-                    if ok and text and text ~= "" then
-                        local loadOk, fn = pcall(loadstring, text)
-                        if loadOk and fn then
-                            local runOk, err = pcall(fn)
-                            if runOk and type(getgenv().MidnightConfig) == "table" then
-                                for flagName, flagValue in pairs(getgenv().MidnightConfig) do
-                                    local SetFunction = Library.SetFlags[flagName]
-                                    if SetFunction then
-                                        if type(flagValue) == "table" and flagValue.Color then
-                                            SetFunction(flagValue.Color, flagValue.Alpha)
-                                        else
-                                            SetFunction(flagValue)
-                                        end
-                                    end
-                                end
-                                Library:SaveAutosave()
-                                Library:Notify({
-                                    Title = "Importado",
-                                    Content = "Configurações importadas e aplicadas!",
-                                    Duration = 4,
-                                    Type = "SAFE"
-                                })
-                                return
-                            end
-                        end
-                        Library:Notify({Title = "Erro ao Importar", Content = "Texto da área de transferência inválido ou incompatível.", Duration = 4, Type = "BUG"})
-                    else
-                        Library:Notify({Title = "Área Vazia", Content = "Área de transferência vazia.", Duration = 4, Type = "BUG"})
                     end
                 end
             })
@@ -2934,7 +2900,7 @@ do
             local Keybind = {
                 Value = "",
                 Key = "",
-                Mode = KeybindData.Mode or "Toggle",
+                Mode = KeybindData.Mode or "Toggle", -- sempre "Toggle" neste wrapper (controla o próprio Toggle)
                 Picking = false
             }
             
@@ -2955,17 +2921,42 @@ do
                 Position = UDim2New(1, -45, 0.5, 0)
             }):AddToTheme({TextColor3 = 'Text'})
             
+            local function UpdateFlag()
+                -- Padronizado com CreateKeybind: sempre salva tabela completa {Key, Mode}
+                Library.Flags[KBFlag] = {
+                    Key = Keybind.Key,
+                    Mode = Keybind.Mode or "Toggle"
+                }
+                Library:SaveAutosave()
+            end
+            
             local function Set(Key)
+                -- Aceita Enum, string "None", ou tabela vinda do LoadConfig {Key=..., Mode=...}
+                if type(Key) == "table" and Key.Key then
+                    Keybind.Key = tostring(Key.Key)
+                    Keybind.Mode = Key.Mode or "Toggle"
+                    local RealKey = (Key.Key == "Backspace" or Key.Key == "None") and "None" or Key.Key
+                    local KeyString = Keys[Keybind.Key] or StringGSub(tostring(RealKey), "Enum.", "") or RealKey
+                    local TextToDisplay = KeyString and StringGSub(StringGSub(KeyString, "KeyCode.", ""), "UserInputType.", "") or "None"
+                    Keybind.Value = TextToDisplay
+                    KeyButton.Instance.Text = "["..TextToDisplay.."]"
+                    UpdateFlag()
+                    return
+                end
+
                 if StringFind(tostring(Key), "Enum") then
-                    local parsedKey = parseKey(tostring(Key))
                     Keybind.Key = tostring(Key)
-                    Key = (Key.Name == "Backspace") and "None" or Key.Name
-                    local KeyString = Keys[Keybind.Key] or StringGSub(Key, "Enum.", "") or "None"
+                    local name = (Key.Name == "Backspace") and "None" or Key.Name
+                    local KeyString = Keys[Keybind.Key] or StringGSub(name, "Enum.", "") or "None"
                     local TextToDisplay = StringGSub(StringGSub(KeyString, "KeyCode.", ""), "UserInputType.", "") or "None"
                     Keybind.Value = TextToDisplay
                     KeyButton.Instance.Text = "["..TextToDisplay.."]"
-                    Library.Flags[KBFlag] = Keybind.Key
-                    Library:SaveAutosave()
+                    UpdateFlag()
+                elseif Key == "None" or Key == nil then
+                    Keybind.Key = "None"
+                    Keybind.Value = "None"
+                    KeyButton.Instance.Text = "[None]"
+                    UpdateFlag()
                 end
             end
             
@@ -2975,10 +2966,7 @@ do
                 local Connection
                 Connection = UserInputService.InputBegan:Connect(function(Input)
                     if Input.KeyCode == Enum.KeyCode.Escape or Input.KeyCode == Enum.KeyCode.Backspace then
-                        Keybind.Key = "None"
-                        Keybind.Value = "None"
-                        KeyButton.Instance.Text = "[None]"
-                        Library.Flags[KBFlag] = "None"
+                        Set("None")
                     else
                         if Input.UserInputType == Enum.UserInputType.Keyboard then
                             Set(Input.KeyCode)
@@ -2986,6 +2974,7 @@ do
                             Set(Input.UserInputType)
                         end
                     end
+                    Keybind.Picking = false
                     Connection:Disconnect()
                 end)
             end)
