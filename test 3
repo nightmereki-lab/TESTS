@@ -1,3 +1,5 @@
+
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -2399,7 +2401,7 @@ do
 
             ReSec:AddParagraph({
                 Title = "Auto Re-Execute",
-                Content = "• Quando ativado, o script é re-executado automaticamente ao entrar em teleporte.\n• Requer executor com suporte a queue_on_teleport.\n• O código é definido na criação da janela: Library.Window({ReExecute = \"loadstring(...)\"}).",
+                Content = "Re-executa o script automaticamente após algum teleport.",
                 Icon = "rbxassetid://11419114175"
             })
 
