@@ -1326,10 +1326,13 @@ do
             if Colorpicker.IsOpen then
                 local button, window = Items.ColorpickerButton.Instance, Items.ColorpickerWindow.Instance
                 local viewport = Camera.ViewportSize
-                local x = MathClamp(button.AbsolutePosition.X, 10, math.max(viewport.X - window.AbsoluteSize.X - 10, 10))
+                local x = button.AbsolutePosition.X + button.AbsoluteSize.X + 5
+                if x + window.AbsoluteSize.X > viewport.X - 10 then
+                    x = button.AbsolutePosition.X - window.AbsoluteSize.X - 5
+                end
                 local y = button.AbsolutePosition.Y + button.AbsoluteSize.Y + 5
                 if y + window.AbsoluteSize.Y > viewport.Y then y = button.AbsolutePosition.Y - window.AbsoluteSize.Y - 5 end
-                window.Position = UDim2New(0, x, 0, MathMax(y, 10))
+                window.Position = UDim2New(0, MathClamp(x, 10, math.max(viewport.X - window.AbsoluteSize.X - 10, 10)), 0, MathMax(y, 10))
                 for other in pairs(Library.OpenFrames) do if other ~= Colorpicker and other.SetOpen then other:SetOpen(false) end end
                 Library.OpenFrames[Colorpicker] = Colorpicker
             else Library.OpenFrames[Colorpicker] = nil end
