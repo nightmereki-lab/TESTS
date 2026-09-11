@@ -1318,11 +1318,29 @@ do
             if color then Colorpicker:SetValueRGB(color, Colorpicker.Alpha) else UpdateDisplay(false) end
         end)
 
+        local ZIndexBackup = {}
+
         function Colorpicker:SetOpen(value)
             Colorpicker.IsOpen = value == true
-            Items.ColorpickerWindow.Instance.Visible = Colorpicker.IsOpen
-            Items.ColorpickerWindow.Instance.ZIndex = Colorpicker.IsOpen and 10000 or 1
-            Items.ColorpickerWindow.Instance.Parent = Colorpicker.IsOpen and Library.Holder.Instance or Library.UnusedHolder.Instance
+            local windowInst = Items.ColorpickerWindow.Instance
+            windowInst.Visible = Colorpicker.IsOpen
+            if Colorpicker.IsOpen then
+                TableClear(ZIndexBackup)
+                ZIndexBackup[windowInst] = windowInst.ZIndex
+                windowInst.ZIndex = 10000
+                for _, obj in ipairs(windowInst:GetDescendants()) do
+                    if obj:IsA("GuiObject") or obj:IsA("UIStroke") then
+                        ZIndexBackup[obj] = obj.ZIndex
+                        obj.ZIndex = obj.ZIndex + 10000
+                    end
+                end
+            else
+                for obj, z in pairs(ZIndexBackup) do
+                    if obj.Parent then obj.ZIndex = z end
+                end
+                TableClear(ZIndexBackup)
+            end
+            windowInst.Parent = Colorpicker.IsOpen and Library.Holder.Instance or Library.UnusedHolder.Instance
             if Colorpicker.IsOpen then
                 local button, window = Items.ColorpickerButton.Instance, Items.ColorpickerWindow.Instance
                 local viewport = Camera.ViewportSize
