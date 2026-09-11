@@ -808,6 +808,9 @@ do
         if self.Holder then 
             self.Holder:Clean()
         end
+        if self.UnusedHolder then 
+            self.UnusedHolder:Clean()
+        end
 
         local lighting = game:GetService("Lighting")
         local blur = lighting:FindFirstChild("Midnight_BadgeBlur")
@@ -1181,7 +1184,7 @@ do
         Items.AlphaGradient = Instances:Create("UIGradient", {
             Parent = Items.AlphaGradientFrame.Instance,
             Rotation = 90,
-            Transparency = NumSequence(0, 1) 
+            Transparency = NumSequence{NumSequenceKeypoint(0, 0), NumSequenceKeypoint(1, 1)}
         })
 
         Items.AlphaDragger = Instances:Create("Frame", {
@@ -1637,11 +1640,11 @@ do
             end)
         end)
 
-        Library:Connect(UserInputService.InputBegan, function(Input)
+        Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
             if Keybind.Value == "None" or Keybind.Value == "" or Keybind.Picking then return end
 
             local targetInput = tostring(Input.KeyCode) == Keybind.Key or tostring(Input.UserInputType) == Keybind.Key
-            if targetInput then
+            if targetInput and not GameProcessed then
                 if Keybind.Mode == "Toggle" then 
                     Keybind:Press()
                 else
@@ -2979,10 +2982,10 @@ do
                 end)
             end)
             
-            Library:Connect(UserInputService.InputBegan, function(Input)
+            Library:Connect(UserInputService.InputBegan, function(Input, GameProcessed)
                 if Keybind.Value == "None" or Keybind.Value == "" or Keybind.Picking then return end
                 local targetInput = tostring(Input.KeyCode) == Keybind.Key or tostring(Input.UserInputType) == Keybind.Key
-                if targetInput then
+                if targetInput and not GameProcessed then
                     Toggle:Set(not Toggle.Value)
                     KBCallback(Toggle.Value)
                 end
