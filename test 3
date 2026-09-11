@@ -1321,6 +1321,7 @@ do
         function Colorpicker:SetOpen(value)
             Colorpicker.IsOpen = value == true
             Items.ColorpickerWindow.Instance.Visible = Colorpicker.IsOpen
+            Items.ColorpickerWindow.Instance.ZIndex = Colorpicker.IsOpen and 10000 or 1
             Items.ColorpickerWindow.Instance.Parent = Colorpicker.IsOpen and Library.Holder.Instance or Library.UnusedHolder.Instance
             if Colorpicker.IsOpen then
                 local button, window = Items.ColorpickerButton.Instance, Items.ColorpickerWindow.Instance
