@@ -1,5 +1,3 @@
-
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -2397,6 +2395,37 @@ do
 
             local GuiSec = ConfigPage:AddSection({Name = "Atalho do Menu"})
 
+            local ReSec = ConfigPage:AddSection({Name = "Auto Re-Execute"})
+
+            ReSec:AddParagraph({
+                Title = "Auto Re-Execute",
+                Content = "• Quando ativado, o script é re-executado automaticamente ao entrar em teleporte.\n• Requer executor com suporte a queue_on_teleport.\n• O código é definido na criação da janela: Library.Window({ReExecute = \"loadstring(...)\"}).",
+                Icon = "rbxassetid://11419114175"
+            })
+
+            ReSec:AddToggle({
+                Name = "Re-executar após Teleporte",
+                Flag = "UI_Auto_Reexecute",
+                Default = false,
+                Callback = function(Value)
+                    if Value and Library.AutoExecuteScript == "" then
+                        Library:Notify({
+                            Title = "Auto Re-Execute",
+                            Content = "Nenhum script configurado. Defina ReExecute na criação da janela.",
+                            Duration = 5,
+                            Type = "BUG"
+                        })
+                    elseif Value then
+                        Library:Notify({
+                            Title = "Auto Re-Execute",
+                            Content = "Ativado! O script será re-executado após teleportes.",
+                            Duration = 4,
+                            Type = "SAFE"
+                        })
+                    end
+                end
+            })
+
             GuiSec:AddKeybind({
                 Name = "Toggle Menu Keybind",
                 Default = Enum.KeyCode.RightControl,
@@ -2444,6 +2473,23 @@ do
         end
 
         setmetatable(Window, Library)
+
+        -- === AUTO RE-EXECUTE (configurável via Data.ReExecute) ===
+        if Data.ReExecute or Data.AutoExecute then
+            Library.AutoExecuteScript = Data.ReExecute or Data.AutoExecute
+        end
+
+        Library:Connect(LocalPlayer.OnTeleport, function(State)
+            if State == Enum.TeleportState.Started and Library.AutoExecuteScript ~= "" and Library.Flags["UI_Auto_Reexecute"] == true then
+                if queue_on_teleport then
+                    queue_on_teleport(Library.AutoExecuteScript)
+                elseif typeof(syn) == "table" and syn.queue_on_teleport then
+                    syn.queue_on_teleport(Library.AutoExecuteScript)
+                else
+                    Library:Notify({Title = "Auto Re-Execute", Content = "Seu executor não suporta queue_on_teleport.", Duration = 5, Type = "BUG"})
+                end
+            end
+        end)
         
         -- === ADICIONA APENAS O MENU DE CONFIG (LOAD FOI PARA O BLOCO SÍNCRONO ABAIXO) ===
         task.defer(function()
