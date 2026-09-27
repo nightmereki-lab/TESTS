@@ -2458,14 +2458,14 @@ do
         function Window:AddConfigPage()
             if not self or not self.Items then return end
 
-            local ConfigPage = self:AddPage({Name = "Config", Icon = "rbxassetid://11419114175"})
+            local ConfigPage = self:AddPage({Name = "Config", Icon = "settings-2"})
             
             local ShareSec = ConfigPage:AddSection({Name = "Configurações"})
             
             ShareSec:AddParagraph({
                 Title = "Auto-Save Automático",
                 Content = "• Suas alterações são salvas automaticamente a cada clique.\n• O carregamento do arquivo local ocorre sozinho ao iniciar o script.\n• Você também pode definir getgenv().MidnightConfig antes de executar a lib.",
-                Icon = "rbxassetid://11419114175"
+                Icon = "settings-2"
             })
 
             ShareSec:AddButton({
@@ -2528,7 +2528,7 @@ do
             ReSec:AddParagraph({
                 Title = "Auto Re-Execute",
                 Content = "Re-executa o script automaticamente após algum teleport.",
-                Icon = "rbxassetid://11419114175"
+                Icon = "refresh-cw"
             })
 
             ReSec:AddToggle({
