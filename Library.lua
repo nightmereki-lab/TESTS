@@ -2587,6 +2587,8 @@ do
             Instances:Create("UICorner", {Parent = ToggleButton.Instance, CornerRadius = UDimNew(0, 18)})
             local TS = Instances:Create("UIStroke", {Parent = ToggleButton.Instance, Color = Library.Theme.Accent, Thickness = 2.5})
             
+            ToggleButton:MakeDraggable()
+            
             ToggleButton:Connect("MouseEnter", function()
                 ToggleButton:Tween(TweenInfo.new(0.15), {BackgroundColor3 = FromRGB(25, 25, 25), Size = UDim2New(0, 74, 0, 74)})
             end)
@@ -2594,9 +2596,34 @@ do
                 ToggleButton:Tween(TweenInfo.new(0.15), {BackgroundColor3 = FromRGB(15, 15, 15), Size = UDim2New(0, 70, 0, 70)})
             end)
 
-            ToggleButton:Connect("MouseButton1Click", function()
-                Window:SetOpen(not Window.IsOpen)
+            -- Só minimiza no clique se não tiver arrastado
+            local dragStartPos = nil
+            local didDrag = false
+
+            ToggleButton:Connect("InputBegan", function(Input)
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                    dragStartPos = Input.Position
+                    didDrag = false
+                end
             end)
+
+            Library:Connect(UserInputService.InputChanged, function(Input)
+                if dragStartPos and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = (Input.Position - dragStartPos).Magnitude
+                    if delta > 6 then
+                        didDrag = true
+                    end
+                end
+            end)
+
+            ToggleButton:Connect("MouseButton1Click", function()
+                if not didDrag then
+                    Window:SetOpen(not Window.IsOpen)
+                end
+                dragStartPos = nil
+                didDrag = false
+            end)
+
             Window.MinimizeButton = ToggleButton.Instance
         end
 
