@@ -256,16 +256,30 @@ do
         Instances.Disconnect = function(self, Name) if self.Instance then return Library:Disconnect(Name) end end
         Instances.Clean = function(self) if self.Instance then self.Instance:Destroy() self = nil end end
 
-        Instances.MakeDraggable = function(self)
+        Instances.MakeDraggable = function(self, CornersOnly, CornerSize)
             if not self.Instance then return self end
         
             local Gui = self.Instance
             local Dragging = false 
             local DragStart, StartPos
+
+            local function IsInCorner(Point)
+                local cs = CornerSize or 44
+                local ap = Gui.AbsolutePosition
+                local asz = Gui.AbsoluteSize
+                local lx = Point.X - ap.X
+                local ly = Point.Y - ap.Y
+                local nearL = lx < cs
+                local nearR = (asz.X - lx) < cs
+                local nearT = ly < cs
+                local nearB = (asz.Y - ly) < cs
+                return (nearL or nearR) and (nearT or nearB)
+            end
         
             self:Connect("InputBegan", function(Input)
                 if Library.IsInteracting then return end 
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                    if CornersOnly and not IsInCorner(Input.Position) then return end
                     Dragging = true
                     DragStart = Input.Position
                     
@@ -1848,10 +1862,27 @@ do
 
             function Window:SetOpen(Bool)
                 self.IsOpen = Bool == true
-                Items["MainFrame"].Instance.Visible = self.IsOpen
+                local frame = Items["MainFrame"].Instance
+                local scale = self.ScaleObj
+                if self.IsOpen then
+                    frame.Visible = true
+                    if scale then
+                        scale.Scale = 0.92
+                        Tween.Create(nil, scale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}, true)
+                    end
+                else
+                    if scale then
+                        local CloseTween = Tween.Create(nil, scale, TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Scale = 0.92}, true)
+                        Library:Connect(CloseTween.Tween.Completed, function()
+                            if not Window.IsOpen then frame.Visible = false end
+                        end)
+                    else
+                        frame.Visible = false
+                    end
+                end
             end
 
-            Items["MainFrame"]:MakeDraggable()
+            Items["MainFrame"]:MakeDraggable(true, 44)
             Items["MainFrame"]:MakeResizeable(Vector2New(673, 511), Vector2New(9999, 9999))
             
             Instances:Create("UICorner", {
@@ -2028,6 +2059,27 @@ do
                 AutomaticSize = Enum.AutomaticSize.X,
                 TextSize = 16
             }):AddToTheme({TextColor3 = 'Text'})
+
+            Items["MinimizeIcon"] = Instances:Create("ImageButton", {
+                Parent = Items["Top"].Instance,
+                AnchorPoint = Vector2New(1, 0.5),
+                Position = UDim2New(1, -14, 0.5, 0),
+                Size = UDim2New(0, 26, 0, 26),
+                BackgroundTransparency = 1,
+                Image = "rbxassetid://128395878680071",
+                AutoButtonColor = false,
+                Active = true
+            })
+
+            Items["MinimizeIcon"]:Connect("MouseEnter", function()
+                Items["MinimizeIcon"]:Tween(TweenInfo.new(0.15), {Size = UDim2New(0, 30, 0, 30)})
+            end)
+            Items["MinimizeIcon"]:Connect("MouseLeave", function()
+                Items["MinimizeIcon"]:Tween(TweenInfo.new(0.15), {Size = UDim2New(0, 26, 0, 26)})
+            end)
+            Items["MinimizeIcon"]:Connect("MouseButton1Click", function()
+                Window:SetOpen(not Window.IsOpen)
+            end)
 
             Items["SearchContainer"] = Instances:Create("Frame", {
                 Parent = Items["Sidebar"].Instance,
@@ -3480,18 +3532,24 @@ do
 
         function Dropdown:SetOpen(Bool)
             Dropdown.Open = Bool
-            Items["Arrow"].Instance.Rotation = Bool and 180 or 0
+            Items["Arrow"]:Tween(TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Rotation = Bool and 180 or 0})
+
+            local searchHeight = 26 + 4 + 1 + 4
+            local listHeight = math.min(#itemButtons * 28, 140)
+            local finalHeight = searchHeight + listHeight + 12
 
             if Bool then
-                Items["Container"].Instance.Visible = true
-                local searchHeight = 26 + 4 + 1 + 4
-                local listHeight = math.min(#itemButtons * 28, 140)
-                local finalHeight = searchHeight + listHeight + 12
-                
                 Items["ScrollList"].Instance.Size = UDim2New(1, 0, 0, listHeight)
-                Items["Container"].Instance.Size = UDim2New(1, 0, 0, finalHeight)
+                Items["Container"].Instance.Visible = true
+                Items["Container"].Instance.Size = UDim2New(1, 0, 0, 0)
+                Items["Container"]:Tween(TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2New(1, 0, 0, finalHeight)})
             else
-                Items["Container"].Instance.Visible = false
+                local CloseTween = Items["Container"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2New(1, 0, 0, 0)})
+                Library:Connect(CloseTween.Tween.Completed, function()
+                    if not Dropdown.Open then
+                        Items["Container"].Instance.Visible = false
+                    end
+                end)
             end
         end
 
