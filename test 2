@@ -122,8 +122,99 @@ do
             SAFE = FromRGB(160, 50, 255),
             NEW  = FromRGB(46, 204, 113),
             VIP  = FromRGB(52, 152, 219)
-        }
+        },
+        Icons = nil,
+        IconsType = "lucide"
     }
+
+    -- === INTEGRAÇÃO COM FOOTAGESUS ICONS ===
+    do
+        local success, iconsModule = pcall(function()
+            return loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Footagesus/Icons/main/Main-v2.lua"))()
+        end)
+
+        if success and iconsModule then
+            Library.Icons = iconsModule
+            if iconsModule.SetIconsType then
+                iconsModule.SetIconsType(Library.IconsType)
+            end
+        else
+            warn("[MidnightLib] Falha ao carregar Footagesus Icons. Usando apenas rbxassetid.")
+        end
+    end
+
+    function Library:SetIconsType(iconType)
+        self.IconsType = iconType or "lucide"
+        if self.Icons and self.Icons.SetIconsType then
+            self.Icons.SetIconsType(self.IconsType)
+        end
+    end
+
+    -- Resolve um ícone: aceita "house", "lucide:house", "sfsymbols:HouseFill" ou rbxassetid://...
+    -- Retorna a string rbxassetid pronta pro Image
+    function Library:GetIcon(iconName)
+        if not iconName or iconName == "" then
+            return nil
+        end
+
+        -- Já é um asset id
+        if type(iconName) == "string" and (StringFind(iconName, "rbxassetid://") or StringFind(iconName, "http")) then
+            return iconName
+        end
+
+        if type(iconName) == "number" then
+            return "rbxassetid://" .. tostring(iconName)
+        end
+
+        if not self.Icons then
+            return nil
+        end
+
+        local result = self.Icons.GetIcon(tostring(iconName))
+        if not result then
+            return nil
+        end
+
+        -- GetIcon pode retornar string direta ou tabela {imageId, data}
+        if type(result) == "string" then
+            return result
+        elseif type(result) == "table" then
+            return result[1] or result.Image
+        end
+
+        return nil
+    end
+
+    -- Cria um ImageLabel pronto com o ícone (útil pra colocar em qualquer lugar)
+    function Library:CreateIcon(config)
+        config = config or {}
+        local iconName = config.Icon or config.Name
+        local size = config.Size or UDim2New(0, 18, 0, 18)
+        local color = config.Color or self.Theme.Text
+        local parent = config.Parent
+
+        local imageId = self:GetIcon(iconName)
+        if not imageId then
+            warn("[MidnightLib] Ícone não encontrado: " .. tostring(iconName))
+            return nil
+        end
+
+        local icon = Instances:Create("ImageLabel", {
+            Parent = parent and (parent.Instance or parent) or nil,
+            Size = size,
+            BackgroundTransparency = 1,
+            Image = imageId,
+            ImageColor3 = color,
+            ScaleType = Enum.ScaleType.Fit,
+            BorderSizePixel = 0
+        })
+
+        if type(color) == "string" and self.Theme[color] then
+            icon:AddToTheme({ImageColor3 = color})
+        end
+
+        return icon
+    end
 
     -- === SISTEMA DE REATIVIDADE (CORREÇÃO DE TIMING) ===
     setmetatable(Library.SetFlags, {
@@ -2634,7 +2725,7 @@ do
                 Parent = Items["Inactive"].Instance,
                 ScaleType = Enum.ScaleType.Fit,
                 ImageTransparency = 0.4,
-                Image = Page.Icon,
+                Image = Library:GetIcon(Page.Icon) or Page.Icon,
                 BackgroundTransparency = 1,
                 Position = UDim2New(0, 8, 0.5, -9),
                 Size = UDim2New(0, 18, 0, 18),
@@ -3665,7 +3756,7 @@ do
             Instances:Create("UIListLayout", { Parent = HeaderFrame.Instance, FillDirection = Enum.FillDirection.Horizontal, Padding = UDimNew(0, 6), VerticalAlignment = Enum.VerticalAlignment.Center })
 
             if Data.Icon then
-                Instances:Create("ImageLabel", { Parent = HeaderFrame.Instance, Size = UDim2New(0, 16, 0, 16), BackgroundTransparency = 1, Image = Data.Icon, ImageColor3 = Library.Theme.Accent }):AddToTheme({ImageColor3 = 'Accent'})
+                Instances:Create("ImageLabel", { Parent = HeaderFrame.Instance, Size = UDim2New(0, 16, 0, 16), BackgroundTransparency = 1, Image = Library:GetIcon(Data.Icon) or Data.Icon, ImageColor3 = Library.Theme.Accent }):AddToTheme({ImageColor3 = 'Accent'})
             end
 
             Items["TitleLabel"] = Instances:Create("TextLabel", { Parent = HeaderFrame.Instance, FontFace = Library.Font, TextColor3 = Library.Theme.Accent, Text = Paragraph.Title, Size = UDim2New(1, -25, 1, 0), BackgroundTransparency = 1, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left }):AddToTheme({TextColor3 = 'Accent'})
