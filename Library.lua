@@ -1,5 +1,3 @@
-
-
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -124,8 +122,99 @@ do
             SAFE = FromRGB(160, 50, 255),
             NEW  = FromRGB(46, 204, 113),
             VIP  = FromRGB(52, 152, 219)
-        }
+        },
+        Icons = nil,
+        IconsType = "lucide"
     }
+
+    -- === INTEGRAÇÃO COM FOOTAGESUS ICONS ===
+    do
+        local success, iconsModule = pcall(function()
+            return loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Footagesus/Icons/main/Main-v2.lua"))()
+        end)
+
+        if success and iconsModule then
+            Library.Icons = iconsModule
+            if iconsModule.SetIconsType then
+                iconsModule.SetIconsType(Library.IconsType)
+            end
+        else
+            warn("[MidnightLib] Falha ao carregar Footagesus Icons. Usando apenas rbxassetid.")
+        end
+    end
+
+    function Library:SetIconsType(iconType)
+        self.IconsType = iconType or "lucide"
+        if self.Icons and self.Icons.SetIconsType then
+            self.Icons.SetIconsType(self.IconsType)
+        end
+    end
+
+    -- Resolve um ícone: aceita "house", "lucide:house", "sfsymbols:HouseFill" ou rbxassetid://...
+    -- Retorna a string rbxassetid pronta pro Image
+    function Library:GetIcon(iconName)
+        if not iconName or iconName == "" then
+            return nil
+        end
+
+        -- Já é um asset id
+        if type(iconName) == "string" and (StringFind(iconName, "rbxassetid://") or StringFind(iconName, "http")) then
+            return iconName
+        end
+
+        if type(iconName) == "number" then
+            return "rbxassetid://" .. tostring(iconName)
+        end
+
+        if not self.Icons then
+            return nil
+        end
+
+        local result = self.Icons.GetIcon(tostring(iconName))
+        if not result then
+            return nil
+        end
+
+        -- GetIcon pode retornar string direta ou tabela {imageId, data}
+        if type(result) == "string" then
+            return result
+        elseif type(result) == "table" then
+            return result[1] or result.Image
+        end
+
+        return nil
+    end
+
+    -- Cria um ImageLabel pronto com o ícone (útil pra colocar em qualquer lugar)
+    function Library:CreateIcon(config)
+        config = config or {}
+        local iconName = config.Icon or config.Name
+        local size = config.Size or UDim2New(0, 18, 0, 18)
+        local color = config.Color or self.Theme.Text
+        local parent = config.Parent
+
+        local imageId = self:GetIcon(iconName)
+        if not imageId then
+            warn("[MidnightLib] Ícone não encontrado: " .. tostring(iconName))
+            return nil
+        end
+
+        local icon = Instances:Create("ImageLabel", {
+            Parent = parent and (parent.Instance or parent) or nil,
+            Size = size,
+            BackgroundTransparency = 1,
+            Image = imageId,
+            ImageColor3 = color,
+            ScaleType = Enum.ScaleType.Fit,
+            BorderSizePixel = 0
+        })
+
+        if type(color) == "string" and self.Theme[color] then
+            icon:AddToTheme({ImageColor3 = color})
+        end
+
+        return icon
+    end
 
     -- === SISTEMA DE REATIVIDADE (CORREÇÃO DE TIMING) ===
     setmetatable(Library.SetFlags, {
@@ -258,16 +347,30 @@ do
         Instances.Disconnect = function(self, Name) if self.Instance then return Library:Disconnect(Name) end end
         Instances.Clean = function(self) if self.Instance then self.Instance:Destroy() self = nil end end
 
-        Instances.MakeDraggable = function(self)
+        Instances.MakeDraggable = function(self, CornersOnly, CornerSize)
             if not self.Instance then return self end
         
             local Gui = self.Instance
             local Dragging = false 
             local DragStart, StartPos
+
+            local function IsInCorner(Point)
+                local cs = CornerSize or 44
+                local ap = Gui.AbsolutePosition
+                local asz = Gui.AbsoluteSize
+                local lx = Point.X - ap.X
+                local ly = Point.Y - ap.Y
+                local nearL = lx < cs
+                local nearR = (asz.X - lx) < cs
+                local nearT = ly < cs
+                local nearB = (asz.Y - ly) < cs
+                return (nearL or nearR) and (nearT or nearB)
+            end
         
             self:Connect("InputBegan", function(Input)
                 if Library.IsInteracting then return end 
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                    if CornersOnly and not IsInCorner(Input.Position) then return end
                     Dragging = true
                     DragStart = Input.Position
                     
@@ -597,8 +700,9 @@ do
         end)
     end
 
-    function Library:CreateBadge(Parent, Data)
+    function Library:CreateBadge(Parent, Data, Options)
         if not Data or not Data.Badge then return end
+        Options = Options or {}
         
         local BType = Data.Badge:upper()
         local BColor = Library.BadgeColors[BType] or Library.Theme.Accent
@@ -637,8 +741,13 @@ do
             TweenService:Create(stroke.Instance, TweenInfo.new(0.15), {Transparency = 0.6}):Play()
         end)
         
+        if Options.Right then
+            Badge.Instance.AnchorPoint = Vector2New(1, 0.5)
+            Badge.Instance.Position = UDim2.new(1, -(Options.Padding or 8), 0.5, 0)
+        end
+
         local function updatePos()
-            if Parent and Parent.Parent then
+            if not Options.Right and Parent and Parent.Parent then
                 Badge.Instance.Position = UDim2New(0, Parent.TextBounds.X + 10, 0.5, -8)
             end
         end
@@ -652,7 +761,7 @@ do
         updatePos()
         
         Badge:Connect("MouseButton1Click", function()
-            Library:CreateInfoPopup(Data.Name or "Informação", BDesc, BType)
+            Library:CreateInfoPopup(Data.Name or Data.Title or "Informação", BDesc, BType)
         end)
         
         return Badge
@@ -1810,7 +1919,7 @@ do
         local Window = {
             Name = Data.Name or Data.name or "MidNight Lib",
             SubName = Data.SubName or Data.subname or "",
-            Logo = Data.Logo or Data.logo or "rbxassetid://81441172534384",
+            Logo = Data.Logo or Data.logo or "rbxassetid://128395878680071",
             Pages = {},
             Items = {},
             IsOpen = true, 
@@ -1844,10 +1953,27 @@ do
 
             function Window:SetOpen(Bool)
                 self.IsOpen = Bool == true
-                Items["MainFrame"].Instance.Visible = self.IsOpen
+                local frame = Items["MainFrame"].Instance
+                local scale = self.ScaleObj
+                if self.IsOpen then
+                    frame.Visible = true
+                    if scale then
+                        scale.Scale = 0.92
+                        Tween.Create(nil, scale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}, true)
+                    end
+                else
+                    if scale then
+                        local CloseTween = Tween.Create(nil, scale, TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Scale = 0.92}, true)
+                        Library:Connect(CloseTween.Tween.Completed, function()
+                            if not Window.IsOpen then frame.Visible = false end
+                        end)
+                    else
+                        frame.Visible = false
+                    end
+                end
             end
 
-            Items["MainFrame"]:MakeDraggable()
+            Items["MainFrame"]:MakeDraggable(true, 44)
             Items["MainFrame"]:MakeResizeable(Vector2New(673, 511), Vector2New(9999, 9999))
             
             Instances:Create("UICorner", {
@@ -2332,14 +2458,14 @@ do
         function Window:AddConfigPage()
             if not self or not self.Items then return end
 
-            local ConfigPage = self:AddPage({Name = "Config", Icon = "rbxassetid://11419114175"})
+            local ConfigPage = self:AddPage({Name = "Config", Icon = "settings-2"})
             
             local ShareSec = ConfigPage:AddSection({Name = "Configurações"})
             
             ShareSec:AddParagraph({
                 Title = "Auto-Save Automático",
                 Content = "• Suas alterações são salvas automaticamente a cada clique.\n• O carregamento do arquivo local ocorre sozinho ao iniciar o script.\n• Você também pode definir getgenv().MidnightConfig antes de executar a lib.",
-                Icon = "rbxassetid://11419114175"
+                Icon = "settings-2"
             })
 
             ShareSec:AddButton({
@@ -2402,7 +2528,7 @@ do
             ReSec:AddParagraph({
                 Title = "Auto Re-Execute",
                 Content = "Re-executa o script automaticamente após algum teleport.",
-                Icon = "rbxassetid://11419114175"
+                Icon = "refresh-cw"
             })
 
             ReSec:AddToggle({
@@ -2599,7 +2725,7 @@ do
                 Parent = Items["Inactive"].Instance,
                 ScaleType = Enum.ScaleType.Fit,
                 ImageTransparency = 0.4,
-                Image = Page.Icon,
+                Image = Library:GetIcon(Page.Icon) or Page.Icon,
                 BackgroundTransparency = 1,
                 Position = UDim2New(0, 8, 0.5, -9),
                 Size = UDim2New(0, 18, 0, 18),
@@ -3132,6 +3258,8 @@ do
 
         Items["Main"]:Connect("MouseButton1Click", function() Library:SafeCall(Button.Callback) end)
         
+        Library:CreateBadge(Items["Main"].Instance, Data, {Right = true})
+
         Button.Section.Window:RegisterElement(Items["Main"].Instance, "Button", Button.Name, Button.Section, Button.Section.Page)
         return Button
     end
@@ -3151,7 +3279,7 @@ do
         }
         local Items = {} do 
             Items["Main"] = Instances:Create("Frame", {Parent = Slider.Section.Items["Content"].Instance, Size = UDim2New(1, 0, 0, 35), BackgroundTransparency = 1})
-            Items["Text"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, Text = Slider.Name, FontFace = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 14, BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 15)})
+            Items["Text"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, Text = Slider.Name, TextXAlignment = Enum.TextXAlignment.Left, FontFace = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 14, BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 15)})
             Items["Bar"] = Instances:Create("Frame", {Parent = Items["Main"].Instance, Position = UDim2New(0, 0, 0, 22), Size = UDim2New(1, 0, 0, 6), BackgroundColor3 = Library.Theme.Element, Active = true})
             Instances:Create("UICorner", {Parent = Items["Bar"].Instance})
             Items["Fill"] = Instances:Create("Frame", {Parent = Items["Bar"].Instance, Size = UDim2New(0, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent})
@@ -3231,6 +3359,8 @@ do
         Library.SetFlags[Slider.Flag] = function(Value)
             Slider:Set(Value)
         end
+
+        Library:CreateBadge(Items["Text"].Instance, Data)
 
         Slider.Section.Window:RegisterElement(Items["Main"].Instance, "Slider", Slider.Name, Slider.Section, Slider.Section.Page)
         return Slider 
@@ -3472,18 +3602,24 @@ do
 
         function Dropdown:SetOpen(Bool)
             Dropdown.Open = Bool
-            Items["Arrow"].Instance.Rotation = Bool and 180 or 0
+            Items["Arrow"]:Tween(TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Rotation = Bool and 180 or 0})
+
+            local searchHeight = 26 + 4 + 1 + 4
+            local listHeight = math.min(#itemButtons * 28, 140)
+            local finalHeight = searchHeight + listHeight + 12
 
             if Bool then
-                Items["Container"].Instance.Visible = true
-                local searchHeight = 26 + 4 + 1 + 4
-                local listHeight = math.min(#itemButtons * 28, 140)
-                local finalHeight = searchHeight + listHeight + 12
-                
                 Items["ScrollList"].Instance.Size = UDim2New(1, 0, 0, listHeight)
-                Items["Container"].Instance.Size = UDim2New(1, 0, 0, finalHeight)
+                Items["Container"].Instance.Visible = true
+                Items["Container"].Instance.Size = UDim2New(1, 0, 0, 0)
+                Items["Container"]:Tween(TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2New(1, 0, 0, finalHeight)})
             else
-                Items["Container"].Instance.Visible = false
+                local CloseTween = Items["Container"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2New(1, 0, 0, 0)})
+                Library:Connect(CloseTween.Tween.Completed, function()
+                    if not Dropdown.Open then
+                        Items["Container"].Instance.Visible = false
+                    end
+                end)
             end
         end
 
@@ -3571,6 +3707,8 @@ do
         Input:Set(Input.Default)
         Library.SetFlags[Input.Flag] = function(Value) Input:Set(Value) end
 
+        Library:CreateBadge(Items["Text"].Instance, Data)
+
         Input.Section.Window:RegisterElement(Items["Main"].Instance, "Input", Input.Name, Input.Section, Input.Section.Page)
         return Input
     end
@@ -3618,12 +3756,13 @@ do
             Instances:Create("UIListLayout", { Parent = HeaderFrame.Instance, FillDirection = Enum.FillDirection.Horizontal, Padding = UDimNew(0, 6), VerticalAlignment = Enum.VerticalAlignment.Center })
 
             if Data.Icon then
-                Instances:Create("ImageLabel", { Parent = HeaderFrame.Instance, Size = UDim2New(0, 16, 0, 16), BackgroundTransparency = 1, Image = Data.Icon, ImageColor3 = Library.Theme.Accent }):AddToTheme({ImageColor3 = 'Accent'})
+                Instances:Create("ImageLabel", { Parent = HeaderFrame.Instance, Size = UDim2New(0, 16, 0, 16), BackgroundTransparency = 1, Image = Library:GetIcon(Data.Icon) or Data.Icon, ImageColor3 = Library.Theme.Accent }):AddToTheme({ImageColor3 = 'Accent'})
             end
 
             Items["TitleLabel"] = Instances:Create("TextLabel", { Parent = HeaderFrame.Instance, FontFace = Library.Font, TextColor3 = Library.Theme.Accent, Text = Paragraph.Title, Size = UDim2New(1, -25, 1, 0), BackgroundTransparency = 1, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left }):AddToTheme({TextColor3 = 'Accent'})
             Items["ContentLabel"] = Instances:Create("TextLabel", { Parent = Container.Instance, FontFace = Library.Font, TextColor3 = Library.Theme.Text, Text = Paragraph.Content, Size = UDim2New(1, 0, 0, 0), BackgroundTransparency = 1, TextSize = 13, TextTransparency = 0.3, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y, TextXAlignment = Enum.TextXAlignment.Left }):AddToTheme({TextColor3 = 'Text'})
         end
+        Library:CreateBadge(Items["TitleLabel"].Instance, Data)
         Paragraph.Section.Window:RegisterElement(Items["Main"].Instance, "Paragraph", Paragraph.Title, Paragraph.Section, Paragraph.Section.Page)
         return Paragraph
     end
@@ -3645,6 +3784,7 @@ do
             KBItems["KeyButton"].Instance.AnchorPoint = Vector2New(1, 0.5)
             KBItems["KeyButton"].Instance.Position = UDim2New(1, 0, 0.5, 0)
         end
+        Library:CreateBadge(Items["Text"].Instance, Data)
         Keybind.Section.Window:RegisterElement(Items["Main"].Instance, "Keybind", Keybind.Name, Keybind.Section, Keybind.Section.Page)
         return Keybind
     end
@@ -3666,14 +3806,18 @@ do
             CPItems["ColorpickerButton"].Instance.AnchorPoint = Vector2New(1, 0.5)
             CPItems["ColorpickerButton"].Instance.Position = UDim2New(1, 0, 0.5, 0)
         end
+        Library:CreateBadge(Items["Text"].Instance, Data)
         Colorpicker.Section.Window:RegisterElement(Items["Main"].Instance, "Colorpicker", Colorpicker.Name, Colorpicker.Section, Colorpicker.Section.Page)
         return Colorpicker
     end
 
     -- LABEL
     Library.Sections.Label = function(self, Text)
+        local LabelData
+        if type(Text) == "table" then LabelData = Text; Text = LabelData.Text or LabelData.Name or "" end
         local Label = {Section = self, Text = Text}
         local l = Instances:Create("TextLabel", {Parent = Label.Section.Items["Content"].Instance, Text = Text, FontFace = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 15, BackgroundTransparency = 1, Size = UDim2New(1, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Left})
+        if LabelData then Library:CreateBadge(l.Instance, LabelData) end
         function Label:SetText(t) l.Instance.Text = t end
         Label.Section.Window:RegisterElement(l.Instance, "Label", Label.Text, Label.Section, Label.Section.Page)
         return Label
