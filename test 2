@@ -637,7 +637,7 @@ do
         end)
         
         if Options.Right then
-            Badge.Instance.AnchorPoint = Vector2.New(1, 0.5)
+            Badge.Instance.AnchorPoint = Vector2New(1, 0.5)
             Badge.Instance.Position = UDim2.new(1, -(Options.Padding or 8), 0.5, 0)
         end
 
