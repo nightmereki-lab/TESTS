@@ -1983,8 +1983,10 @@ do
 
             local ScaleObj = InstanceNew("UIScale")
             ScaleObj.Parent = Items["MainFrame"].Instance
-            ScaleObj.Scale = 1
+            local initialScale = Data.Scale or Data.scale or 1
+            ScaleObj.Scale = initialScale
             Window.ScaleObj = ScaleObj
+            Window.InitialScale = initialScale
             
             Items["Sidebar"] = Instances:Create("Frame", {
                 Parent = Items["MainFrame"].Instance,
@@ -2460,6 +2462,22 @@ do
 
             local ConfigPage = self:AddPage({Name = "Config", Icon = "settings-2"})
             
+            local GuiSec = ConfigPage:AddSection({Name = "Interface"})
+
+            GuiSec:AddSlider({
+                Name = "Tamanho da UI",
+                Min = 50,
+                Max = 150,
+                Default = (Window.InitialScale or 1) * 100,
+                Decimals = 0,
+                Flag = "UI_Scale",
+                Callback = function(Value)
+                    if Window.ScaleObj then
+                        Window.ScaleObj.Scale = Value / 100
+                    end
+                end
+            })
+
             local ShareSec = ConfigPage:AddSection({Name = "Configurações"})
             
             ShareSec:AddParagraph({
@@ -3284,7 +3302,10 @@ do
             Instances:Create("UICorner", {Parent = Items["Bar"].Instance})
             Items["Fill"] = Instances:Create("Frame", {Parent = Items["Bar"].Instance, Size = UDim2New(0, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent})
             Instances:Create("UICorner", {Parent = Items["Fill"].Instance})
-            Items["Val"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1})
+            Items["Val"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1, Active = true, Visible = true})
+            Items["ValInput"] = Instances:Create("TextBox", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, -2), Size = UDim2New(0, 50, 0, 18), Text = "", FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundColor3 = Library.Theme.Element, BorderSizePixel = 0, Visible = false, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Right, PlaceholderText = tostring(Slider.Value), PlaceholderColor3 = FromRGB(120, 120, 130)})
+            Instances:Create("UICorner", {Parent = Items["ValInput"].Instance, CornerRadius = UDimNew(0, 4)})
+            Instances:Create("UIStroke", {Parent = Items["ValInput"].Instance, Color = Library.Theme.Accent, Thickness = 1, Transparency = 0.5})
             
             Items["SliderDot"] = Instances:Create("Frame", {
                 Parent = Items["Fill"].Instance,
@@ -3314,6 +3335,39 @@ do
             Library:SafeCall(Slider.Callback, Clamped)
             Library:SaveAutosave()
         end
+
+        local function ConfirmInput()
+            local text = Items["ValInput"].Instance.Text
+            local num = tonumber(text)
+            if num then
+                Set(num)
+            end
+            Items["ValInput"].Instance.Visible = false
+            Items["Val"].Instance.Visible = true
+            Items["ValInput"].Instance.Text = ""
+        end
+
+        Items["Val"]:Connect("InputBegan", function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                Items["Val"].Instance.Visible = false
+                Items["ValInput"].Instance.PlaceholderText = tostring(Slider.Value)
+                Items["ValInput"].Instance.Visible = true
+                Items["ValInput"].Instance:CaptureFocus()
+            end
+        end)
+
+        Items["ValInput"]:Connect("Focused", function()
+            Items["ValInput"].Instance.Text = ""
+        end)
+
+        Items["ValInput"]:Connect("FocusLost", function()
+            ConfirmInput()
+        end)
+
+        Items["ValInput"].Instance:GetPropertyChangedSignal("Text"):Connect(function()
+            local t = Items["ValInput"].Instance.Text
+            Items["ValInput"].Instance.Text = t:gsub("[^%d%.%-]", "")
+        end)
 
         local function Update()
             local MousePos = UserInputService:GetMouseLocation()
