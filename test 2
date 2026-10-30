@@ -2687,15 +2687,15 @@ do
         })
         local Text = Instances:Create("TextLabel", {
             Parent = Top.Instance,
-            FontFace = Library.Font,
-            TextColor3 = Library.Theme["Text"],
+            FontFace = Font.new(Library.Font.Face, Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+            TextColor3 = Library.Theme["Accent"],
             Text = Name,
             Size = UDim2New(0, 0, 1, 0),
             BackgroundTransparency = 1,
             Position = UDim2New(0, 12, 0, 0),
             AutomaticSize = Enum.AutomaticSize.X,
-            TextSize = 16
-        }):AddToTheme({TextColor3 = 'Text'})
+            TextSize = 19
+        }):AddToTheme({TextColor3 = 'Accent'})
         local Content = Instances:Create("Frame", {
             Parent = SectionFrame.Instance,
             BackgroundTransparency = 1,
@@ -2715,6 +2715,7 @@ do
             Window = self,
             Name = Data.Name or Data.name or "Page",
             Icon = Data.Icon or Data.icon or "rbxassetid://72196061405823",
+            Description = Data.Description or Data.description or Data.desc or "",
             Items = {},
             Active = false,
             Sections = {},
@@ -2779,10 +2780,55 @@ do
             })
             Instances:Create("UIPadding", {Parent = Items["Page"].Instance, PaddingTop = UDimNew(0, 10), PaddingBottom = UDimNew(0, 10)})
 
+            -- === CABECALHO DA PAGINA (icone + titulo + descricao) ===
+            Page.Header = Instances:Create("Frame", {
+                Parent = Page.Window.Items["Content"].Instance,
+                Size = UDim2New(1, 0, 0, 64),
+                Position = UDim2New(0, 0, 0, 8),
+                BackgroundTransparency = 1,
+                Visible = false
+            })
+
+            local HeaderIcon = Instances:Create("ImageLabel", {
+                Parent = Page.Header.Instance,
+                ScaleType = Enum.ScaleType.Fit,
+                Image = Library:GetIcon(Page.Icon) or Page.Icon,
+                BackgroundTransparency = 1,
+                Position = UDim2New(0, 16, 0.5, -16),
+                Size = UDim2New(0, 32, 0, 32),
+            }):AddToTheme({ImageColor3 = 'Accent'})
+
+            local HeaderTitle = Instances:Create("TextLabel", {
+                Parent = Page.Header.Instance,
+                FontFace = Font.new(Library.Font.Face, Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+                TextColor3 = Library.Theme["Text"],
+                Text = Page.Name,
+                BackgroundTransparency = 1,
+                Position = UDim2New(0, 58, 0, 12),
+                Size = UDim2New(1, -70, 0, 22),
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextSize = 22
+            }):AddToTheme({TextColor3 = 'Text'})
+
+            local HeaderDesc = Instances:Create("TextLabel", {
+                Parent = Page.Header.Instance,
+                FontFace = Library.Font,
+                TextColor3 = Library.Theme["Text"],
+                TextTransparency = 0.4,
+                Text = Page.Description,
+                BackgroundTransparency = 1,
+                Position = UDim2New(0, 58, 0, 36),
+                Size = UDim2New(1, -70, 0, 16),
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                TextSize = 14
+            }):AddToTheme({TextColor3 = 'Text'})
+
             -- === BARRA DE SUB-ABAS FIXA (existe em toda página, com ou sem sub-abas) ===
             Page.SubTabContainer = Instances:Create("Frame", {
                 Parent = Page.Window.Items["Content"].Instance,
-                Size = UDim2New(1, 0, 1, 0),
+                Size = UDim2New(1, 0, 1, -64),
+                Position = UDim2New(0, 0, 0, 64),
                 BackgroundTransparency = 1,
                 Visible = false
             })
@@ -2843,6 +2889,7 @@ do
                 TweenService:Create(Items["Icon"].Instance, TweenInfo.new(0.2), {ImageColor3 = FromRGB(0,0,0), ImageTransparency = 0}):Play()
 
                 self.SubTabContainer.Instance.Visible = true
+                self.Header.Instance.Visible = true
                 if #self.SubTabs == 0 then
                     Items["Page"].Instance.Visible = true
                     Items["Page"].Instance.Position = UDim2New(0, 0, 0, 15)
@@ -2858,6 +2905,7 @@ do
                 TweenService:Create(Items["Icon"].Instance, TweenInfo.new(0.2), {ImageColor3 = Library.Theme.Text, ImageTransparency = 0.4}):Play()
 
                 self.SubTabContainer.Instance.Visible = false
+                self.Header.Instance.Visible = false
                 Items["Page"].Instance.Visible = false
                 for _, tab in ipairs(self.SubTabs) do
                     tab.Frame.Instance.Visible = false
@@ -3302,8 +3350,8 @@ do
             Instances:Create("UICorner", {Parent = Items["Bar"].Instance})
             Items["Fill"] = Instances:Create("Frame", {Parent = Items["Bar"].Instance, Size = UDim2New(0, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent})
             Instances:Create("UICorner", {Parent = Items["Fill"].Instance})
-            Items["Val"] = Instances:Create("TextLabel", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1, Active = true, Visible = true})
-            Items["ValInput"] = Instances:Create("TextBox", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, -2), Size = UDim2New(0, 50, 0, 18), Text = "", FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundColor3 = Library.Theme.Element, BorderSizePixel = 0, Visible = false, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Right, PlaceholderText = tostring(Slider.Value), PlaceholderColor3 = FromRGB(120, 120, 130)})
+            Items["Val"] = Instances:Create("TextButton", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Size = UDim2New(0, 50, 0, 18), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Right})
+            Items["ValInput"] = Instances:Create("TextBox", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, -2), Size = UDim2New(0, 50, 0, 18), Text = "", FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundColor3 = Library.Theme.Element, BorderSizePixel = 0, Visible = false, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Right, PlaceholderText = tostring(Slider.Value), PlaceholderColor3 = FromRGB(120, 120, 130), ReturnKeyDisablesInteraction = true})
             Instances:Create("UICorner", {Parent = Items["ValInput"].Instance, CornerRadius = UDimNew(0, 4)})
             Instances:Create("UIStroke", {Parent = Items["ValInput"].Instance, Color = Library.Theme.Accent, Thickness = 1, Transparency = 0.5})
             
@@ -3347,13 +3395,13 @@ do
             Items["ValInput"].Instance.Text = ""
         end
 
-        Items["Val"]:Connect("InputBegan", function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-                Items["Val"].Instance.Visible = false
-                Items["ValInput"].Instance.PlaceholderText = tostring(Slider.Value)
-                Items["ValInput"].Instance.Visible = true
+        Items["Val"]:Connect("MouseButton1Click", function()
+            Items["Val"].Instance.Visible = false
+            Items["ValInput"].Instance.PlaceholderText = tostring(Slider.Value)
+            Items["ValInput"].Instance.Visible = true
+            task.defer(function()
                 Items["ValInput"].Instance:CaptureFocus()
-            end
+            end)
         end)
 
         Items["ValInput"]:Connect("Focused", function()
