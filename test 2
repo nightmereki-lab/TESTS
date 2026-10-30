@@ -2663,6 +2663,18 @@ do
         return Window
     end
 
+    local function GetBoldFont()
+        local ok, bold = pcall(function()
+            return Font.new(Library.Font.Face, Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+        end)
+        if ok and bold then return bold end
+        local ok2, fallback = pcall(function()
+            return Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+        end)
+        if ok2 and fallback then return fallback end
+        return Library.Font
+    end
+
     local function BuildSectionVisuals(ParentInstance, Name)
         local SectionOutline = Instances:Create("Frame", {
             Parent = ParentInstance,
@@ -2687,7 +2699,7 @@ do
         })
         local Text = Instances:Create("TextLabel", {
             Parent = Top.Instance,
-            FontFace = Font.new(Library.Font.Face, Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+            FontFace = GetBoldFont(),
             TextColor3 = Library.Theme["Accent"],
             Text = Name,
             Size = UDim2New(0, 0, 1, 0),
@@ -2800,7 +2812,7 @@ do
 
             local HeaderTitle = Instances:Create("TextLabel", {
                 Parent = Page.Header.Instance,
-                FontFace = Font.new(Library.Font.Face, Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+                FontFace = GetBoldFont(),
                 TextColor3 = Library.Theme["Text"],
                 Text = Page.Name,
                 BackgroundTransparency = 1,
