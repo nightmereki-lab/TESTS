@@ -3362,10 +3362,7 @@ do
             Instances:Create("UICorner", {Parent = Items["Bar"].Instance})
             Items["Fill"] = Instances:Create("Frame", {Parent = Items["Bar"].Instance, Size = UDim2New(0, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent})
             Instances:Create("UICorner", {Parent = Items["Fill"].Instance})
-            Items["Val"] = Instances:Create("TextButton", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, 0), Size = UDim2New(0, 50, 0, 18), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Right})
-            Items["ValInput"] = Instances:Create("TextBox", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, 0, 0, -2), Size = UDim2New(0, 50, 0, 18), Text = "", FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundColor3 = Library.Theme.Element, BorderSizePixel = 0, Visible = false, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Right, PlaceholderText = tostring(Slider.Value), PlaceholderColor3 = FromRGB(120, 120, 130), ReturnKeyDisablesInteraction = true})
-            Instances:Create("UICorner", {Parent = Items["ValInput"].Instance, CornerRadius = UDimNew(0, 4)})
-            Instances:Create("UIStroke", {Parent = Items["ValInput"].Instance, Color = Library.Theme.Accent, Thickness = 1, Transparency = 0.5})
+            Items["Val"] = Instances:Create("TextBox", {Parent = Items["Main"].Instance, AnchorPoint = Vector2New(1, 0), Position = UDim2New(1, -2, 0, 0), Size = UDim2New(0, 60, 0, 18), Text = tostring(Slider.Value), FontFace = Library.Font, TextColor3 = Library.Theme.Accent, TextSize = 14, BackgroundTransparency = 1, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Right, ClearTextOnFocus = false, ReturnKeyDisablesInteraction = true, PlaceholderText = tostring(Slider.Value), PlaceholderColor3 = FromRGB(120, 120, 130), ZIndex = 5})
             
             Items["SliderDot"] = Instances:Create("Frame", {
                 Parent = Items["Fill"].Instance,
@@ -3390,43 +3387,34 @@ do
             
             local Perc = (Clamped - Slider.Min) / (Slider.Max - Slider.Min)
             Items["Fill"].Instance.Size = UDim2New(Perc, 0, 1, 0)
-            Items["Val"].Instance.Text = tostring(Clamped)
+            if not Items["Val"].Instance:IsFocused() then
+                Items["Val"].Instance.Text = tostring(Clamped)
+            end
             Library.Flags[Slider.Flag] = Clamped
             Library:SafeCall(Slider.Callback, Clamped)
             Library:SaveAutosave()
         end
 
-        local function ConfirmInput()
-            local text = Items["ValInput"].Instance.Text
-            local num = tonumber(text)
+        Items["Val"]:Connect("Focused", function()
+            Items["Val"].Instance.Text = ""
+        end)
+
+        Items["Val"]:Connect("FocusLost", function()
+            local num = tonumber(Items["Val"].Instance.Text)
             if num then
                 Set(num)
+            else
+                Items["Val"].Instance.Text = tostring(Slider.Value)
             end
-            Items["ValInput"].Instance.Visible = false
-            Items["Val"].Instance.Visible = true
-            Items["ValInput"].Instance.Text = ""
-        end
-
-        Items["Val"]:Connect("MouseButton1Click", function()
-            Items["Val"].Instance.Visible = false
-            Items["ValInput"].Instance.PlaceholderText = tostring(Slider.Value)
-            Items["ValInput"].Instance.Visible = true
-            task.defer(function()
-                Items["ValInput"].Instance:CaptureFocus()
-            end)
         end)
 
-        Items["ValInput"]:Connect("Focused", function()
-            Items["ValInput"].Instance.Text = ""
-        end)
-
-        Items["ValInput"]:Connect("FocusLost", function()
-            ConfirmInput()
-        end)
-
-        Items["ValInput"].Instance:GetPropertyChangedSignal("Text"):Connect(function()
-            local t = Items["ValInput"].Instance.Text
-            Items["ValInput"].Instance.Text = t:gsub("[^%d%.%-]", "")
+        Items["Val"].Instance:GetPropertyChangedSignal("Text"):Connect(function()
+            if not Items["Val"].Instance:IsFocused() then return end
+            local t = Items["Val"].Instance.Text
+            local filtered = t:gsub("[^%d%.%-]", "")
+            if filtered ~= t then
+                Items["Val"].Instance.Text = filtered
+            end
         end)
 
         local function Update()
