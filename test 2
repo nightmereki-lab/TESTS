@@ -221,8 +221,13 @@ do
         config = config or {}
         local iconName = config.Icon or config.Name
         local size = config.Size or UDim2New(0, 18, 0, 18)
-        local color = config.Color or self.Theme.Text
+        local color = config.Color or "Text"
         local parent = config.Parent
+        -- aceita Color3 ou nome de cor do tema ("Accent", "Text"...)
+        local resolvedColor = color
+        if type(color) == "string" then
+            resolvedColor = self.Theme[color] or self.Theme.Text
+        end
 
         local imageId = self:GetIcon(iconName)
         if not imageId then
@@ -235,7 +240,7 @@ do
             Size = size,
             BackgroundTransparency = 1,
             Image = imageId,
-            ImageColor3 = color,
+            ImageColor3 = resolvedColor,
             ScaleType = Enum.ScaleType.Fit,
             BorderSizePixel = 0
         })
@@ -243,6 +248,9 @@ do
         if type(color) == "string" and self.Theme[color] then
             icon:AddToTheme({ImageColor3 = color})
         end
+
+        if config.Position then icon.Instance.Position = config.Position end
+        if config.AnchorPoint then icon.Instance.AnchorPoint = config.AnchorPoint end
 
         return icon
     end
