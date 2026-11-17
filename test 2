@@ -2171,15 +2171,19 @@ do
             ScaleObj = nil
         }
 
-        function Window:RegisterElement(Element, Type, Name, Section, Page)
+        -- Api: tabela do elemento (Toggle/Slider/...) usada pela busca pra mostrar valor e agir direto no resultado
+        -- Badge: "RISK", "SAFE"... (mostrado no resultado e filtrável com @risk)
+        function Window:RegisterElement(Element, Type, Name, Section, Page, Api, Badge)
             TableInsert(self.SearchableElements, {
                 Element = Element,
                 Type = Type,
                 Name = Name,
-                SearchName = StringLower(Name or ""), 
+                SearchName = StringLower(Name or ""),
                 Section = Section,
                 Page = Page,
-                SubTab = Section and Section.SubTab or nil
+                SubTab = Section and Section.SubTab or nil,
+                Api = Api,
+                Badge = Badge and StringFind(tostring(Badge), "%S") and tostring(Badge):upper() or nil
             })
         end
 
@@ -2419,278 +2423,872 @@ do
                 TextSize = 16
             }):AddToTheme({TextColor3 = 'Text'})
 
-            Items["SearchContainer"] = Instances:Create("Frame", {
+            -- =====================================================================
+            -- BUSCA (paleta de comandos)
+            -- Ctrl+F (ou clique na barra da sidebar) abre. ↑/↓ navega, Enter executa,
+            -- Shift+Enter vai até o elemento, Tab completa filtro, Esc limpa/fecha.
+            -- Filtros: #toggle #button #slider ... | @risk @safe ... | >Página
+            -- =====================================================================
+            Items["SearchContainer"] = Instances:Create("TextButton", {
                 Parent = Items["Sidebar"].Instance,
                 Position = UDim2New(0, 10, 0, 75),
                 Size = UDim2New(1, -20, 0, 30),
                 BackgroundColor3 = Library.Theme.Inline,
-                BorderSizePixel = 0
+                BorderSizePixel = 0,
+                Text = "",
+                AutoButtonColor = false
             }):AddToTheme({BackgroundColor3 = 'Inline'})
             Instances:Create("UICorner", { Parent = Items["SearchContainer"].Instance, CornerRadius = UDimNew(0, 6) })
             Instances:Create("UIStroke", { Parent = Items["SearchContainer"].Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
 
-            Items["SearchInput"] = Instances:Create("TextBox", {
+            Items["SearchHint"] = Instances:Create("TextLabel", {
                 Parent = Items["SearchContainer"].Instance,
-                Size = UDim2New(1, -10, 1, 0),
+                Size = UDim2New(1, -60, 1, 0),
                 Position = UDim2New(0, 10, 0, 0),
                 BackgroundTransparency = 1,
-                Text = "",
-                PlaceholderText = "Procurar...",
-                PlaceholderColor3 = FromRGB(120, 120, 130),
+                Text = "Procurar...",
                 TextColor3 = Library.Theme.Text,
+                TextTransparency = 0.5,
                 FontFace = Library.Font,
                 TextSize = 14,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                ClearTextOnFocus = false
+                TextXAlignment = Enum.TextXAlignment.Left
             }):AddToTheme({TextColor3 = 'Text'})
 
-            local SearchPopup = {} do
-                SearchPopup.Overlay = Instances:Create("TextButton", {
-                    Parent = Items["MainFrame"].Instance,
-                    Size = UDim2New(1, 0, 1, 0),
-                    BackgroundColor3 = FromRGB(5, 5, 6),
-                    BackgroundTransparency = 1,
-                    Text = "",
-                    AutoButtonColor = false,
-                    Visible = false,
-                    ZIndex = 25000
-                })
-                Instances:Create("UICorner", { Parent = SearchPopup.Overlay.Instance, CornerRadius = UDimNew(0, 8) })
+            Instances:Create("TextLabel", {
+                Parent = Items["SearchContainer"].Instance,
+                AnchorPoint = Vector2New(1, 0.5),
+                Position = UDim2New(1, -6, 0.5, 0),
+                Size = UDim2New(0, 44, 0, 18),
+                BackgroundColor3 = Library.Theme.Background,
+                Text = "Ctrl F",
+                TextColor3 = Library.Theme.Text,
+                TextTransparency = 0.5,
+                FontFace = Library.Font,
+                TextSize = 11
+            }):AddToTheme({BackgroundColor3 = 'Background', TextColor3 = 'Text'})
 
-                SearchPopup.Container = Instances:Create("Frame", {
-                    Parent = SearchPopup.Overlay.Instance,
-                    AnchorPoint = Vector2New(0.5, 0.5),
-                    Position = UDim2New(0.5, 0, 0.5, 0),
-                    Size = UDim2New(0, 420, 0, 320),
-                    BackgroundColor3 = Library.Theme.Background,
-                    BorderSizePixel = 0,
-                    ZIndex = 25001
-                }):AddToTheme({BackgroundColor3 = 'Background'})
-                Instances:Create("UICorner", { Parent = SearchPopup.Container.Instance, CornerRadius = UDimNew(0, 8) })
-                Instances:Create("UIStroke", { Parent = SearchPopup.Container.Instance, Color = Library.Theme.Accent, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Transparency = 0.2 })
+            local Search = {
+                IsOpen = false,
+                Results = {},
+                Sel = 1,
+                Favorites = {},
+                Recent = {},
+                FavoritesOnly = false,
+                ShowingRecent = false,
+                Key = Data.SearchKey or Enum.KeyCode.F
+            }
+            Window.Search = Search
 
-                SearchPopup.Header = Instances:Create("TextLabel", {
-                    Parent = SearchPopup.Container.Instance,
-                    Text = "Resultados da Pesquisa",
-                    FontFace = Library.Font,
-                    TextColor3 = Library.Theme.Accent,
-                    TextSize = 18,
-                    Size = UDim2New(1, 0, 0, 40),
-                    Position = UDim2New(0, 0, 0, 5),
-                    BackgroundTransparency = 1,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    ZIndex = 25002
-                }):AddToTheme({TextColor3 = 'Accent'})
+            local SEARCH_Z = 40000
+            local ROW_H, VISIBLE_ROWS, POOL_SIZE, MAX_RECENT = 46, 8, 20, 5
+            local SCORE_FAV, SCORE_RECENT, PATH_WEIGHT = 150, 75, 0.6
+            local PREFS_PATH = Library.Folders.Directory .. "/search_prefs.json"
+            local MUTED = FromRGB(120, 125, 135)
+            local OK_COLOR = FromRGB(46, 204, 113)
 
-                SearchPopup.Scroll = Instances:Create("ScrollingFrame", {
-                    Parent = SearchPopup.Container.Instance,
-                    Size = UDim2New(1, -24, 1, -95),
-                    Position = UDim2New(0, 12, 0, 45),
-                    BackgroundTransparency = 1,
-                    BorderSizePixel = 0,
-                    CanvasSize = UDim2New(0, 0, 0, 0),
-                    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                    ScrollBarThickness = 3,
-                    ScrollBarImageColor3 = Library.Theme.Accent,
-                    ZIndex = 25002
-                }):AddToTheme({ScrollBarImageColor3 = 'Accent'})
-                Instances:Create("UIListLayout", { Parent = SearchPopup.Scroll.Instance, Padding = UDimNew(0, 5) })
+            local TypeTags = {
+                toggle = "TGL", button = "BTN", slider = "SLD", dropdown = "DRP", input = "INP",
+                keybind = "KEY", colorpicker = "COR", paragraph = "TXT", label = "LBL"
+            }
+            -- largura do controle à direita de cada linha (a estrela fica sempre à esquerda dele)
+            local ControlWidth = { toggle = 34, button = 74 }
+            local VALUE_WIDTH = 90
 
-                SearchPopup.CloseBtn = Instances:Create("TextButton", {
-                    Parent = SearchPopup.Container.Instance,
-                    Text = "FECHAR",
-                    FontFace = Library.Font,
-                    TextColor3 = FromRGB(255, 255, 255),
-                    BackgroundColor3 = Library.Theme.Element,
-                    Size = UDim2New(0, 120, 0, 32),
-                    Position = UDim2New(0.5, -60, 1, -42),
-                    BorderSizePixel = 0,
-                    ZIndex = 25003
-                }):AddToTheme({BackgroundColor3 = 'Element'})
-                Instances:Create("UICorner", { Parent = SearchPopup.CloseBtn.Instance, CornerRadius = UDimNew(0, 6) })
-                Instances:Create("UIStroke", { Parent = SearchPopup.CloseBtn.Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
+            -- apelidos: só abreviações reais
+            local Aliases = {
+                ws = "walkspeed", jp = "jumppower", spd = "speed", tp = "teleport",
+                fly = "voar", nc = "noclip", cfg = "config", cod = "codigos", codigo = "codigos"
+            }
+            Search.Aliases = Aliases
 
-                local function CloseSearch()
-                    TweenService:Create(SearchPopup.Overlay.Instance, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
-                    local T = TweenService:Create(SearchPopup.Container.Instance, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2New(0, 0, 0, 0)})
-                    T:Play()
-                    T.Completed:Connect(function()
-                        SearchPopup.Overlay.Instance.Visible = false
-                    end)
-                end
+            local AccentMap = {
+                ["á"]="a",["à"]="a",["â"]="a",["ã"]="a",["é"]="e",["ê"]="e",["í"]="i",["ó"]="o",["ô"]="o",["õ"]="o",["ú"]="u",["ç"]="c",
+                ["Á"]="a",["À"]="a",["Â"]="a",["Ã"]="a",["É"]="e",["Ê"]="e",["Í"]="i",["Ó"]="o",["Ô"]="o",["Õ"]="o",["Ú"]="u",["Ç"]="c"
+            }
 
-                SearchPopup.CloseBtn:Connect("MouseButton1Click", CloseSearch)
-                SearchPopup.CloseBtn:Connect("MouseEnter", function()
-                    TweenService:Create(SearchPopup.CloseBtn.Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Accent}):Play()
+            -- minúsculo + sem acento; devolve também mapa posição normalizada -> bytes no original (pro destaque)
+            local function SearchNormalize(s)
+                local out, map = {}, {}
+                local ok = pcall(function()
+                    for p, code in utf8.codes(s) do
+                        local ch = utf8.char(code)
+                        out[#out + 1] = AccentMap[ch] or StringLower(ch)
+                        map[#out] = {p, p + #ch - 1}
+                    end
                 end)
-                SearchPopup.CloseBtn:Connect("MouseLeave", function()
-                    TweenService:Create(SearchPopup.CloseBtn.Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Element}):Play()
-                end)
-
-                function SearchPopup:Open()
-                    Library.CurrentPopupZIndex = Library.CurrentPopupZIndex + 20 
-                    local baseZ = Library.CurrentPopupZIndex
-
-                    SearchPopup.Overlay.Instance.ZIndex = baseZ
-                    SearchPopup.Container.Instance.ZIndex = baseZ + 1
-                    SearchPopup.Header.Instance.ZIndex = baseZ + 2
-                    SearchPopup.Scroll.Instance.ZIndex = baseZ + 2
-                    SearchPopup.CloseBtn.Instance.ZIndex = baseZ + 3
-
-                    SearchPopup.Overlay.Instance.Visible = true
-                    SearchPopup.Container.Instance.Size = UDim2New(0, 0, 0, 0)
-                    TweenService:Create(SearchPopup.Overlay.Instance, TweenInfo.new(0.25), {BackgroundTransparency = 0.65}):Play()
-                    TweenService:Create(SearchPopup.Container.Instance, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2New(0, 420, 0, 320)}):Play()
+                if not ok then
+                    out, map = {}, {}
+                    for i = 1, #s do out[i] = StringLower(s:sub(i, i)); map[i] = {i, i} end
                 end
-
-                function SearchPopup:Close()
-                    CloseSearch()
-                end
+                return TableConcat(out), map
             end
 
-            local function UpdateSearch()
-                local success, err = pcall(function()
-                    local query = StringLower(Items["SearchInput"].Instance.Text)
-                    
-                    for _, child in ipairs(SearchPopup.Scroll.Instance:GetChildren()) do
-                        if child:IsA("TextButton") or child:IsA("TextLabel") then
-                            child:Destroy()
-                        end
-                    end
+            local function SearchEscape(s)
+                return (tostring(s):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+            end
 
-                    if query == "" then
-                        SearchPopup:Close()
-                        return
+            -- fuzzy: letras em ordem, com limite de "pulos" pra não aceitar qualquer coisa
+            local function FuzzyScore(n, q)
+                local qLen = #q
+                if qLen < 2 then return 0 end
+                local ni, qi, gaps, firstHit = 1, 1, 0, nil
+                while ni <= #n and qi <= qLen do
+                    if n:sub(ni, ni) == q:sub(qi, qi) then
+                        firstHit = firstHit or ni
+                        qi += 1
+                    elseif firstHit then
+                        gaps += 1
                     end
+                    ni += 1
+                end
+                if qi <= qLen or gaps > qLen * 2 then return 0 end
+                local bonus = (firstHit == 1 or n:sub(firstHit - 1, firstHit - 1) == " ") and 50 or 0
+                return MathMax(10, 90 - gaps * 8 + bonus - (firstHit - 1))
+            end
 
-                    if not SearchPopup.Overlay.Instance.Visible then
-                        SearchPopup:Open()
+            local function ScoreText(text, words)
+                local n = SearchNormalize(text)
+                local q = TableConcat(words, " ")
+                if q == "" then return 1 end
+                if n == q then return 1000 end
+                if n:sub(1, #q) == q then return 800 end
+                local literal = 0
+                for _, w in ipairs(words) do
+                    local i = StringFind(n, w, 1, true)
+                    if not i then
+                        return FuzzyScore((n:gsub(" ", "")), (q:gsub(" ", "")))
                     end
+                    literal += (i == 1 or n:sub(i - 1, i - 1) == " ") and 300 or 100
+                end
+                return literal
+            end
 
-                    local matchesCount = 0
-                    local queryWords = {}
-                    for word in string.gmatch(query, "%S+") do
-                        TableInsert(queryWords, word)
+            local function SearchHighlight(name, words)
+                if #words == 0 then return SearchEscape(name) end
+                local n, map = SearchNormalize(name)
+                local marks = {}
+                for _, w in ipairs(words) do
+                    local i = StringFind(n, w, 1, true)
+                    if i and map[i] and map[i + #w - 1] then
+                        TableInsert(marks, {map[i][1], map[i + #w - 1][2]})
                     end
+                end
+                table.sort(marks, function(a, b) return a[1] < b[1] end)
+                local hex = Library.Theme.Accent:ToHex()
+                local out, last = {}, 1
+                for _, m in ipairs(marks) do
+                    if m[1] >= last then
+                        out[#out + 1] = SearchEscape(name:sub(last, m[1] - 1))
+                        out[#out + 1] = '<font color="#' .. hex .. '"><b>' .. SearchEscape(name:sub(m[1], m[2])) .. '</b></font>'
+                        last = m[2] + 1
+                    end
+                end
+                out[#out + 1] = SearchEscape(name:sub(last))
+                return TableConcat(out)
+            end
 
-                    for _, data in ipairs(Window.SearchableElements) do
-                        local matches = false
-                        local searchName = data.SearchName or ""
-                        
-                        if StringFind(searchName, query, 1, true) then
-                            matches = true
-                        elseif #queryWords > 0 then
-                            for _, word in ipairs(queryWords) do
-                                if StringFind(searchName, word, 1, true) then
-                                    matches = true
-                                    break
+            local function EntryPath(d)
+                local parts = {}
+                if d.Page and d.Page.Name then TableInsert(parts, d.Page.Name) end
+                if d.SubTab and d.SubTab.Name then TableInsert(parts, d.SubTab.Name) end
+                if d.Section and d.Section.Name then TableInsert(parts, d.Section.Name) end
+                return TableConcat(parts, " › ")
+            end
+
+            local function EntryKey(d)
+                return EntryPath(d) .. "/" .. tostring(d.Name)
+            end
+
+            -- ===== persistência (favoritos + recentes, por chave "Página › Seção/Nome") =====
+            local function SaveSearchPrefs()
+                if not writefile then return end
+                local fav = {}
+                for k, v in pairs(Search.Favorites) do if v then TableInsert(fav, k) end end
+                pcall(writefile, PREFS_PATH, HttpService:JSONEncode({fav = fav, recent = Search.Recent}))
+            end
+
+            do
+                if isfile and readfile then
+                    local ok, raw = pcall(function() return isfile(PREFS_PATH) and readfile(PREFS_PATH) end)
+                    if ok and raw then
+                        local ok2, decoded = pcall(HttpService.JSONDecode, HttpService, raw)
+                        if ok2 and type(decoded) == "table" then
+                            if type(decoded.fav) == "table" then
+                                for _, k in ipairs(decoded.fav) do
+                                    if type(k) == "string" then Search.Favorites[k] = true end
+                                end
+                            end
+                            if type(decoded.recent) == "table" then
+                                for _, k in ipairs(decoded.recent) do
+                                    if type(k) == "string" and #Search.Recent < MAX_RECENT then TableInsert(Search.Recent, k) end
                                 end
                             end
                         end
-
-                        if matches then
-                            matchesCount = matchesCount + 1
-
-                            local Row = Instances:Create("TextButton", {
-                                Parent = SearchPopup.Scroll.Instance,
-                                Size = UDim2New(1, 0, 0, 35),
-                                BackgroundColor3 = Library.Theme.Element,
-                                Text = "",
-                                AutoButtonColor = false,
-                                ZIndex = 25003
-                            })
-                            Instances:Create("UICorner", { Parent = Row.Instance, CornerRadius = UDimNew(0, 6) })
-                            Instances:Create("UIStroke", { Parent = Row.Instance, Color = Library.Theme.Outline, Thickness = 1 })
-
-                            local Label = Instances:Create("TextLabel", {
-                                Parent = Row.Instance,
-                                Text = data.Name,
-                                FontFace = Library.Font,
-                                TextColor3 = Library.Theme.Text,
-                                TextSize = 14,
-                                Position = UDim2New(0, 10, 0, 0),
-                                Size = UDim2New(0.6, -10, 1, 0),
-                                BackgroundTransparency = 1,
-                                TextXAlignment = Enum.TextXAlignment.Left,
-                                ZIndex = 25004
-                            })
-
-                            local PathLabel = Instances:Create("TextLabel", {
-                                Parent = Row.Instance,
-                                Text = (data.Page.Name or "Aba") .. " > " .. (data.Section.Name or "Seção"),
-                                FontFace = Library.Font,
-                                TextColor3 = Library.Theme.Accent,
-                                TextSize = 11,
-                                Position = UDim2New(0.6, 0, 0, 0),
-                                Size = UDim2New(0.4, -10, 1, 0),
-                                BackgroundTransparency = 1,
-                                TextXAlignment = Enum.TextXAlignment.Right,
-                                ZIndex = 25004
-                            })
-
-                            Row.Instance.MouseEnter:Connect(function()
-                                TweenService:Create(Row.Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Inline}):Play()
-                            end)
-                            Row.Instance.MouseLeave:Connect(function()
-                                TweenService:Create(Row.Instance, TweenInfo.new(0.15), {BackgroundColor3 = Library.Theme.Element}):Play()
-                            end)
-
-                            Row.Instance.MouseButton1Click:Connect(function()
-                                SearchPopup:Close()
-                                data.Page:Turn(true)
-
-                                if data.SubTab then
-                                    for _, tab in ipairs(data.Page.SubTabs) do
-                                        tab:Turn(tab == data.SubTab)
-                                    end
-                                end
-                                
-                                task_delay(0.3, function()
-                                    if data.Element and data.Element.Parent then
-                                        local stroke = data.Element:FindFirstChildOfClass("UIStroke")
-                                        if stroke then
-                                            local flash = TweenService:Create(stroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 3, true), {Color = Library.Theme.Accent})
-                                            flash:Play()
-                                        else
-                                            local flash = TweenService:Create(data.Element, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 3, true), {BackgroundTransparency = 0.5})
-                                            flash:Play()
-                                        end
-                                    end
-                                end)
-                            end)
-                        end
                     end
-
-                    if matchesCount == 0 then
-                        local NoResults = Instances:Create("TextLabel", {
-                            Parent = SearchPopup.Scroll.Instance,
-                            Text = "Nenhum resultado encontrado.",
-                            FontFace = Library.Font,
-                            TextColor3 = Library.Theme.Text,
-                            TextTransparency = 0.5,
-                            TextSize = 14,
-                            Size = UDim2New(1, 0, 0, 50),
-                            BackgroundTransparency = 1,
-                            TextXAlignment = Enum.TextXAlignment.Left,
-                            ZIndex = 25004
-                        })
-                    end
-                end)
-                if not success then
-                    warn("Erro na pesquisa: " .. tostring(err))
                 end
             end
 
-            local searchThread
-            local function TriggerSearch()
-                if searchThread then task.cancel(searchThread) end
-                searchThread = task.delay(0.15, function()
-                    UpdateSearch()
+            local function IsRecent(key) return TableFind(Search.Recent, key) ~= nil end
+
+            local function PushRecent(key)
+                local i = TableFind(Search.Recent, key)
+                if i then TableRemove(Search.Recent, i) end
+                TableInsert(Search.Recent, 1, key)
+                while #Search.Recent > MAX_RECENT do TableRemove(Search.Recent) end
+                SaveSearchPrefs()
+            end
+
+            -- ===== UI =====
+            local function Z(n) return SEARCH_Z + (n or 0) end
+            local SearchUI = {}
+
+            SearchUI.Dim = Instances:Create("TextButton", {
+                Parent = Library.Holder.Instance,
+                Size = UDim2New(1, 0, 1, 0),
+                BackgroundColor3 = FromRGB(0, 0, 0),
+                BackgroundTransparency = 0.55,
+                BorderSizePixel = 0,
+                Text = "",
+                AutoButtonColor = false,
+                Visible = false,
+                ZIndex = Z(0)
+            })
+
+            SearchUI.Panel = Instances:Create("Frame", {
+                Parent = Library.Holder.Instance,
+                AnchorPoint = Vector2New(0.5, 0),
+                Position = UDim2New(0.5, 0, 0.14, 0),
+                Size = UDim2New(0.92, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                BackgroundColor3 = Library.Theme.Background,
+                BorderSizePixel = 0,
+                Active = true,
+                Visible = false,
+                ZIndex = Z(1)
+            }):AddToTheme({BackgroundColor3 = 'Background'})
+            Instances:Create("UISizeConstraint", { Parent = SearchUI.Panel.Instance, MaxSize = Vector2New(560, math.huge) })
+            Instances:Create("UICorner", { Parent = SearchUI.Panel.Instance, CornerRadius = UDimNew(0, 10) })
+            Instances:Create("UIStroke", { Parent = SearchUI.Panel.Instance, Color = Library.Theme.Outline, Thickness = 1 }):AddToTheme({Color = 'Outline'})
+            SearchUI.Scale = Instances:Create("UIScale", { Parent = SearchUI.Panel.Instance, Scale = 1 })
+            Instances:Create("UIListLayout", { Parent = SearchUI.Panel.Instance, SortOrder = Enum.SortOrder.LayoutOrder })
+
+            -- topo: campo
+            local STop = Instances:Create("Frame", { Parent = SearchUI.Panel.Instance, LayoutOrder = 1, Size = UDim2New(1, 0, 0, 50), BackgroundTransparency = 1, ZIndex = Z(2) })
+            Instances:Create("Frame", { Parent = STop.Instance, AnchorPoint = Vector2New(0, 1), Position = UDim2New(0, 0, 1, 0), Size = UDim2New(1, 0, 0, 1), BackgroundColor3 = Library.Theme.Outline, BorderSizePixel = 0, ZIndex = Z(2) }):AddToTheme({BackgroundColor3 = 'Outline'})
+            local SIconRing = Instances:Create("Frame", { Parent = STop.Instance, Position = UDim2New(0, 16, 0, 17), Size = UDim2New(0, 12, 0, 12), BackgroundTransparency = 1, ZIndex = Z(3) })
+            Instances:Create("UICorner", { Parent = SIconRing.Instance, CornerRadius = UDimNew(1, 0) })
+            Instances:Create("UIStroke", { Parent = SIconRing.Instance, Color = Library.Theme.Accent, Thickness = 2 }):AddToTheme({Color = 'Accent'})
+            Instances:Create("Frame", { Parent = STop.Instance, Position = UDim2New(0, 27, 0, 28), Size = UDim2New(0, 6, 0, 2), Rotation = 45, BackgroundColor3 = Library.Theme.Accent, BorderSizePixel = 0, ZIndex = Z(3) }):AddToTheme({BackgroundColor3 = 'Accent'})
+
+            SearchUI.Box = Instances:Create("TextBox", {
+                Parent = STop.Instance,
+                Position = UDim2New(0, 44, 0, 0),
+                Size = UDim2New(1, -110, 1, 0),
+                BackgroundTransparency = 1,
+                Text = "",
+                PlaceholderText = "Procurar função...  (#toggle  @risk  >Página)",
+                PlaceholderColor3 = MUTED,
+                TextColor3 = Library.Theme.Text,
+                FontFace = Library.Font,
+                TextSize = 15,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                ClearTextOnFocus = false,
+                ClipsDescendants = true,
+                ZIndex = Z(3)
+            }):AddToTheme({TextColor3 = 'Text'})
+            local SBox = SearchUI.Box.Instance
+
+            local SKbd = Instances:Create("TextLabel", {
+                Parent = STop.Instance,
+                AnchorPoint = Vector2New(1, 0.5),
+                Position = UDim2New(1, -14, 0.5, 0),
+                Size = UDim2New(0, 40, 0, 20),
+                BackgroundColor3 = Library.Theme.Inline,
+                Text = "Esc",
+                TextColor3 = MUTED,
+                FontFace = Library.Font,
+                TextSize = 11,
+                ZIndex = Z(3)
+            }):AddToTheme({BackgroundColor3 = 'Inline'})
+            Instances:Create("UICorner", { Parent = SKbd.Instance, CornerRadius = UDimNew(0, 4) })
+
+            -- filtros rápidos
+            local SChips = Instances:Create("Frame", { Parent = SearchUI.Panel.Instance, LayoutOrder = 2, Size = UDim2New(1, 0, 0, 38), BackgroundTransparency = 1, ZIndex = Z(2) })
+            Instances:Create("UIPadding", { Parent = SChips.Instance, PaddingLeft = UDimNew(0, 14), PaddingRight = UDimNew(0, 14) })
+            Instances:Create("UIListLayout", { Parent = SChips.Instance, FillDirection = Enum.FillDirection.Horizontal, Padding = UDimNew(0, 6), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder })
+            Instances:Create("Frame", { Parent = SearchUI.Panel.Instance, LayoutOrder = 3, Size = UDim2New(1, 0, 0, 1), BackgroundColor3 = Library.Theme.Outline, BorderSizePixel = 0, ZIndex = Z(2) }):AddToTheme({BackgroundColor3 = 'Outline'})
+
+            SearchUI.Header = Instances:Create("TextLabel", {
+                Parent = SearchUI.Panel.Instance,
+                LayoutOrder = 4,
+                Size = UDim2New(1, 0, 0, 26),
+                BackgroundTransparency = 1,
+                Text = "",
+                TextColor3 = MUTED,
+                FontFace = Library.Font,
+                TextSize = 11,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                ZIndex = Z(2)
+            })
+            Instances:Create("UIPadding", { Parent = SearchUI.Header.Instance, PaddingLeft = UDimNew(0, 16) })
+
+            SearchUI.Scroll = Instances:Create("ScrollingFrame", {
+                Parent = SearchUI.Panel.Instance,
+                LayoutOrder = 5,
+                Size = UDim2New(1, 0, 0, ROW_H),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                CanvasSize = UDim2New(0, 0, 0, 0),
+                ScrollBarThickness = 3,
+                ScrollBarImageColor3 = Library.Theme.Outline,
+                ScrollingDirection = Enum.ScrollingDirection.Y,
+                ZIndex = Z(2)
+            }):AddToTheme({ScrollBarImageColor3 = 'Outline'})
+            local SScroll = SearchUI.Scroll.Instance
+            Instances:Create("UIListLayout", { Parent = SScroll, SortOrder = Enum.SortOrder.LayoutOrder })
+
+            SearchUI.Empty = Instances:Create("TextLabel", {
+                Parent = SScroll,
+                LayoutOrder = 9999,
+                Size = UDim2New(1, 0, 0, 110),
+                BackgroundTransparency = 1,
+                Visible = false,
+                Text = "",
+                TextColor3 = MUTED,
+                FontFace = Library.Font,
+                TextSize = 13,
+                TextWrapped = true,
+                ZIndex = Z(3)
+            })
+
+            local SFooter = Instances:Create("Frame", { Parent = SearchUI.Panel.Instance, LayoutOrder = 6, Size = UDim2New(1, 0, 0, 34), BackgroundColor3 = Library.Theme.Inline, BorderSizePixel = 0, ZIndex = Z(2) }):AddToTheme({BackgroundColor3 = 'Inline'})
+            Instances:Create("UIPadding", { Parent = SFooter.Instance, PaddingLeft = UDimNew(0, 14), PaddingRight = UDimNew(0, 14) })
+            Instances:Create("UIListLayout", { Parent = SFooter.Instance, FillDirection = Enum.FillDirection.Horizontal, Padding = UDimNew(0, 14), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder })
+            for Index, Hint in ipairs({{"↑↓", "navegar"}, {"Enter", "executar"}, {"Shift+Enter", "ir até"}, {"Tab", "completar"}, {"Esc", "limpar"}}) do
+                Instances:Create("TextLabel", {
+                    Parent = SFooter.Instance,
+                    LayoutOrder = Index,
+                    Size = UDim2New(0, 0, 0, 18),
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    BackgroundTransparency = 1,
+                    RichText = true,
+                    Text = "<b>" .. Hint[1] .. "</b>  " .. Hint[2],
+                    TextColor3 = MUTED,
+                    FontFace = Library.Font,
+                    TextSize = 11,
+                    ZIndex = Z(3)
+                })
+            end
+
+            SearchUI.Toast = Instances:Create("TextLabel", {
+                Parent = Library.Holder.Instance,
+                AnchorPoint = Vector2New(0.5, 1),
+                Position = UDim2New(0.5, 0, 0.14, -8),
+                Size = UDim2New(0, 0, 0, 30),
+                AutomaticSize = Enum.AutomaticSize.X,
+                BackgroundColor3 = Library.Theme.Element,
+                BackgroundTransparency = 1,
+                Text = "",
+                TextColor3 = Library.Theme.Text,
+                TextTransparency = 1,
+                FontFace = Library.Font,
+                TextSize = 13,
+                Visible = false,
+                ZIndex = Z(10)
+            })
+            Instances:Create("UICorner", { Parent = SearchUI.Toast.Instance, CornerRadius = UDimNew(0, 6) })
+            Instances:Create("UIPadding", { Parent = SearchUI.Toast.Instance, PaddingLeft = UDimNew(0, 12), PaddingRight = UDimNew(0, 12) })
+            local SToastStroke = Instances:Create("UIStroke", { Parent = SearchUI.Toast.Instance, Color = Library.Theme.Accent, Thickness = 1, Transparency = 1 })
+
+            -- pool de linhas reaproveitadas (nada é criado/destruído a cada tecla)
+            local Rows = {}
+            for Index = 1, POOL_SIZE do
+                local Row = {}
+                Row.Frame = Instances:Create("TextButton", { Parent = SScroll, LayoutOrder = Index, Size = UDim2New(1, 0, 0, ROW_H), BackgroundColor3 = Library.Theme.Element, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Visible = false, ZIndex = Z(3) }).Instance
+                Row.Bar = Instances:Create("Frame", { Parent = Row.Frame, Position = UDim2New(0, 0, 0, 6), Size = UDim2New(0, 2, 1, -12), BackgroundColor3 = Library.Theme.Accent, BorderSizePixel = 0, Visible = false, ZIndex = Z(4) }).Instance
+                Row.Tag = Instances:Create("TextLabel", { Parent = Row.Frame, Position = UDim2New(0, 14, 0.5, -10), Size = UDim2New(0, 34, 0, 20), BackgroundColor3 = Library.Theme.Inline, TextColor3 = MUTED, FontFace = Library.Font, TextSize = 10, ZIndex = Z(4) }).Instance
+                Instances:Create("UICorner", { Parent = Row.Tag, CornerRadius = UDimNew(0, 4) })
+                Row.Name = Instances:Create("TextLabel", { Parent = Row.Frame, Position = UDim2New(0, 58, 0, 6), Size = UDim2New(0, 0, 0, 18), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, RichText = true, TextColor3 = Library.Theme.Text, FontFace = Library.Font, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = Z(4) }).Instance
+                Row.Badge = Instances:Create("TextLabel", { Parent = Row.Frame, Position = UDim2New(0, 0, 0, 8), Size = UDim2New(0, 38, 0, 15), BackgroundTransparency = 0.85, FontFace = Library.Font, TextSize = 10, Visible = false, ZIndex = Z(4) }).Instance
+                Instances:Create("UICorner", { Parent = Row.Badge, CornerRadius = UDimNew(0, 4) })
+                Row.Path = Instances:Create("TextLabel", { Parent = Row.Frame, Position = UDim2New(0, 58, 0, 25), Size = UDim2New(1, -230, 0, 14), BackgroundTransparency = 1, RichText = true, TextColor3 = MUTED, FontFace = Library.Font, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = Z(4) }).Instance
+                Row.Switch = Instances:Create("TextButton", { Parent = Row.Frame, AnchorPoint = Vector2New(1, 0.5), Position = UDim2New(1, -16, 0.5, 0), Size = UDim2New(0, 34, 0, 18), BackgroundColor3 = Library.Theme.Inline, Text = "", AutoButtonColor = false, ZIndex = Z(5) }).Instance
+                Instances:Create("UICorner", { Parent = Row.Switch, CornerRadius = UDimNew(1, 0) })
+                Row.Knob = Instances:Create("Frame", { Parent = Row.Switch, AnchorPoint = Vector2New(0, 0.5), Position = UDim2New(0, 4, 0.5, 0), Size = UDim2New(0, 10, 0, 10), BackgroundColor3 = FromRGB(255, 255, 255), BorderSizePixel = 0, ZIndex = Z(6) }).Instance
+                Instances:Create("UICorner", { Parent = Row.Knob, CornerRadius = UDimNew(1, 0) })
+                Row.Run = Instances:Create("TextButton", { Parent = Row.Frame, AnchorPoint = Vector2New(1, 0.5), Position = UDim2New(1, -16, 0.5, 0), Size = UDim2New(0, 74, 0, 24), BackgroundColor3 = Library.Theme.Inline, Text = "Executar", TextColor3 = Library.Theme.Text, FontFace = Library.Font, TextSize = 12, AutoButtonColor = false, ZIndex = Z(5) }).Instance
+                Instances:Create("UICorner", { Parent = Row.Run, CornerRadius = UDimNew(0, 5) })
+                Row.Value = Instances:Create("TextLabel", { Parent = Row.Frame, AnchorPoint = Vector2New(1, 0.5), Position = UDim2New(1, -16, 0.5, 0), Size = UDim2New(0, VALUE_WIDTH, 0, 20), BackgroundTransparency = 1, TextColor3 = Library.Theme.Accent, FontFace = Library.Font, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = Z(5) }).Instance
+                Row.Star = Instances:Create("TextButton", { Parent = Row.Frame, AnchorPoint = Vector2New(1, 0.5), Position = UDim2New(1, -58, 0.5, 0), Size = UDim2New(0, 20, 0, 20), BackgroundTransparency = 1, Text = "☆", TextColor3 = MUTED, FontFace = Library.Font, TextSize = 15, AutoButtonColor = false, ZIndex = Z(6) }).Instance
+                Row.Flashing = false
+                Rows[Index] = Row
+            end
+
+            -- ===== lógica =====
+            local toastId = 0
+            local function SearchToast(Message, Kind)
+                toastId += 1
+                local Id = toastId
+                local Toast = SearchUI.Toast.Instance
+                Toast.Text = Message
+                Toast.BackgroundColor3 = Library.Theme.Element
+                Toast.TextColor3 = Library.Theme.Text
+                SToastStroke.Instance.Color = Kind == "ok" and OK_COLOR or Library.Theme.Accent
+                Toast.Visible = true
+                TweenService:Create(Toast, TweenInfo.new(0.15), {BackgroundTransparency = 0, TextTransparency = 0}):Play()
+                TweenService:Create(SToastStroke.Instance, TweenInfo.new(0.15), {Transparency = 0.3}):Play()
+                task_delay(1.8, function()
+                    if Id ~= toastId or not Toast.Parent then return end
+                    TweenService:Create(Toast, TweenInfo.new(0.3), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+                    TweenService:Create(SToastStroke.Instance, TweenInfo.new(0.3), {Transparency = 1}):Play()
                 end)
             end
 
-            Items["SearchInput"].Instance:GetPropertyChangedSignal("Text"):Connect(TriggerSearch)
-            Items["SearchInput"].Instance.FocusLost:Connect(UpdateSearch)
+            local function ValueText(d)
+                local Api, Kind = d.Api, d.Kind
+                if not Api then return "" end
+                if Kind == "slider" then
+                    local Decimals = Api.Decimals or 0
+                    local V = tonumber(Api.Value) or 0
+                    return Decimals > 0 and StringFormat("%." .. Decimals .. "f", V) or tostring(MathFloor(V + 0.5))
+                elseif Kind == "dropdown" then
+                    if type(Api.Value) == "table" then
+                        local Count = 0
+                        for _, On in pairs(Api.Value) do if On then Count += 1 end end
+                        return Count .. " selec."
+                    end
+                    return Api.Value ~= nil and tostring(Api.Value) or "-"
+                elseif Kind == "input" then
+                    local V = tostring(Api.Value or "")
+                    return V == "" and "-" or V
+                elseif Kind == "keybind" then
+                    local KB = Api.KB
+                    return KB and ("[" .. ((KB.Value ~= nil and KB.Value ~= "") and KB.Value or "None") .. "]") or ""
+                elseif Kind == "colorpicker" then
+                    local CP = Api.CP
+                    return CP and CP.HexValue and ("#" .. tostring(CP.HexValue):upper()) or ""
+                end
+                return ""
+            end
+
+            local function UpdateHeader()
+                local H = SearchUI.Header.Instance
+                if Search.ShowingRecent then
+                    H.Text = #Search.Results > 0 and "USADOS RECENTEMENTE" or "COMECE A DIGITAR PARA PROCURAR"
+                elseif #Search.Results > 0 then
+                    H.Text = StringFormat("%d RESULTADO(S)  ·  %d/%d", #Search.Results, Search.Sel, #Search.Results)
+                else
+                    H.Text = "0 RESULTADO(S)"
+                end
+            end
+
+            local function Paint()
+                local Theme = Library.Theme
+                for Index, Row in ipairs(Rows) do
+                    local R = Search.Results[Index]
+                    Row.Frame.Visible = R ~= nil
+                    if R then
+                        local d, Selected = R.d, Index == Search.Sel
+                        local Kind = d.Kind
+                        if not Row.Flashing then
+                            Row.Frame.BackgroundColor3 = Theme.Element
+                            Row.Frame.BackgroundTransparency = Selected and 0 or 1
+                        end
+                        Row.Bar.BackgroundColor3 = Theme.Accent
+                        Row.Bar.Visible = Selected
+                        Row.Tag.Text = TypeTags[Kind] or "•"
+                        Row.Tag.BackgroundColor3 = Theme.Inline
+                        Row.Tag.TextColor3 = Selected and Theme.Accent or MUTED
+                        Row.Name.Text = SearchHighlight(d.Name, R.w)
+                        Row.Name.TextColor3 = Theme.Text
+                        Row.Path.Text = #R.w > 0 and SearchHighlight(R.path, R.w) or SearchEscape(R.path)
+
+                        local Badge = d.Badge
+                        Row.Badge.Visible = Badge ~= nil
+                        if Badge then
+                            local C = Library.BadgeColors[Badge] or Theme.Accent
+                            Row.Badge.Text, Row.Badge.TextColor3, Row.Badge.BackgroundColor3 = Badge, C, C
+                            Row.Badge.Position = UDim2New(0, 58 + Row.Name.TextBounds.X + 8, 0, 8)
+                        end
+
+                        local Fav = Search.Favorites[R.key]
+                        Row.Star.Text = Fav and "★" or "☆"
+                        Row.Star.TextColor3 = Fav and Theme.Accent or MUTED
+
+                        local Value = ValueText(d)
+                        Row.Switch.Visible = Kind == "toggle" and d.Api ~= nil
+                        Row.Run.Visible = Kind == "button" and d.Api ~= nil
+                        Row.Value.Visible = not Row.Switch.Visible and not Row.Run.Visible and Value ~= ""
+
+                        local Width = Row.Switch.Visible and ControlWidth.toggle or (Row.Run.Visible and ControlWidth.button) or (Row.Value.Visible and VALUE_WIDTH) or 0
+                        Row.Star.Position = UDim2New(1, -(16 + Width + (Width > 0 and 8 or 0)), 0.5, 0)
+
+                        if Row.Switch.Visible then
+                            local On = d.Api.Value == true
+                            Row.Switch.BackgroundColor3 = On and Theme.Accent or Theme.Inline
+                            Row.Knob.Position = On and UDim2New(0, 20, 0.5, 0) or UDim2New(0, 4, 0.5, 0)
+                        elseif Row.Run.Visible then
+                            Row.Run.BackgroundColor3 = Theme.Inline
+                            Row.Run.TextColor3 = Theme.Text
+                        elseif Row.Value.Visible then
+                            Row.Value.Text = Value
+                            Row.Value.TextColor3 = (Kind == "colorpicker" and d.Api.CP and d.Api.CP.Value) or Theme.Accent
+                        end
+                    end
+                end
+
+                local Empty = SearchUI.Empty.Instance
+                Empty.Visible = #Search.Results == 0
+                if Empty.Visible then
+                    Empty.Text = Search.FavoritesOnly and "Nenhum favorito ainda. Clique na ☆ de um resultado."
+                        or Search.ShowingRecent and "Digite o nome de uma função para começar."
+                        or "Nada encontrado.\n\nTente:\n  • sem acentos (ex: 'codigos')\n  • abreviações (ws, jp, tp, fly)\n  • remover filtros (#toggle, @risk, >Página)"
+                end
+                local Visible = MathClamp(#Search.Results, 1, VISIBLE_ROWS)
+                SScroll.Size = UDim2New(1, 0, 0, #Search.Results == 0 and 110 or Visible * ROW_H)
+                UpdateHeader()
+            end
+
+            local function ScrollToSel()
+                local Row = Rows[Search.Sel]
+                if not Row or not Row.Frame.Visible then return end
+                local Top = Row.Frame.AbsolutePosition.Y - SScroll.AbsolutePosition.Y
+                local Bottom = Top + Row.Frame.AbsoluteSize.Y
+                local Height = SScroll.AbsoluteSize.Y
+                local Scale = SearchUI.Scale.Instance.Scale
+                if Top < 0 then
+                    SScroll.CanvasPosition = Vector2New(0, MathMax(0, SScroll.CanvasPosition.Y + Top / Scale))
+                elseif Bottom > Height then
+                    SScroll.CanvasPosition = Vector2New(0, SScroll.CanvasPosition.Y + (Bottom - Height) / Scale)
+                end
+            end
+
+            local function RunSearch()
+                local Raw = SBox.Text
+                local Words, PathWords, TypeFilter, BadgeFilter, PageFilter = {}, {}, nil, nil, nil
+                for Token in SearchNormalize(Raw):gmatch("%S+") do
+                    local First = Token:sub(1, 1)
+                    if Token == "›" then
+                        -- separador de caminho (vem do Tab em ">Página "): ignora
+                    elseif First == "#" then TypeFilter = Token:sub(2)
+                    elseif First == "@" then BadgeFilter = Token:sub(2)
+                    elseif First == ">" then PageFilter = Token:sub(2); TableInsert(PathWords, PageFilter)
+                    else TableInsert(Words, Aliases[Token] or Token) end
+                end
+
+                local Results = {}
+                Search.ShowingRecent = Raw:match("^%s*$") ~= nil and not Search.FavoritesOnly
+
+                local Entries = {}
+                for Index, d in ipairs(Window.SearchableElements) do
+                    if d.Name and d.Name ~= "" and d.Element and d.Element.Parent then
+                        d.Kind = StringLower(tostring(d.Type or ""))
+                        TableInsert(Entries, {d = d, i = Index, path = EntryPath(d), key = EntryKey(d)})
+                    end
+                end
+
+                if Search.ShowingRecent then
+                    for _, Key in ipairs(Search.Recent) do
+                        for _, E in ipairs(Entries) do
+                            if E.key == Key then
+                                E.s, E.w = 1, {}
+                                TableInsert(Results, E)
+                                break
+                            end
+                        end
+                    end
+                else
+                    for _, E in ipairs(Entries) do
+                        local d = E.d
+                        local S = ScoreText(d.Name, Words)
+                        if #PathWords > 0 then
+                            local SP = ScoreText(E.path, PathWords)
+                            S = MathMax(S, SP > 0 and SP * PATH_WEIGHT or 0)
+                        end
+                        if S > 0
+                            and (not TypeFilter or StringFind(d.Kind, TypeFilter, 1, true) == 1)
+                            and (not BadgeFilter or (d.Badge and StringLower(d.Badge) == BadgeFilter))
+                            and (not PageFilter or SearchNormalize(E.path):sub(1, #PageFilter) == PageFilter)
+                            and (not Search.FavoritesOnly or Search.Favorites[E.key]) then
+                            E.s, E.w = S, Words
+                            E.final = S + (Search.Favorites[E.key] and SCORE_FAV or 0) + (IsRecent(E.key) and SCORE_RECENT or 0)
+                            TableInsert(Results, E)
+                        end
+                    end
+                    table.sort(Results, function(A, B)
+                        if A.final ~= B.final then return A.final > B.final end
+                        return A.i < B.i
+                    end)
+                    while #Results > POOL_SIZE do TableRemove(Results) end
+                end
+
+                Search.Results = Results
+                Search.Sel = MathClamp(Search.Sel, 1, MathMax(#Results, 1))
+                Paint()
+                task.defer(ScrollToSel)
+            end
+            Search.Refresh = RunSearch
+
+            local function FlashRow(Row)
+                if not Row then return end
+                Row.Flashing = true
+                Row.Frame.BackgroundColor3 = OK_COLOR
+                Row.Frame.BackgroundTransparency = 0.55
+                task_delay(0.6, function()
+                    if not Row.Frame.Parent then return end
+                    local Index = TableFind(Rows, Row)
+                    TweenService:Create(Row.Frame, TweenInfo.new(0.4), {BackgroundColor3 = Library.Theme.Element, BackgroundTransparency = (Index == Search.Sel) and 0 or 1}):Play()
+                    task_delay(0.4, function() Row.Flashing = false; if Search.IsOpen then Paint() end end)
+                end)
+            end
+
+            -- destaca o elemento na página (overlay temporário na cor de destaque)
+            local function FlashElement(Element)
+                if not (Element and Element.Parent) then return end
+                local Overlay = InstanceNew("Frame")
+                Overlay.Name = "\0"
+                Overlay.Size = UDim2New(1, 0, 1, 0)
+                Overlay.BackgroundColor3 = Library.Theme.Accent
+                Overlay.BackgroundTransparency = 1
+                Overlay.BorderSizePixel = 0
+                Overlay.ZIndex = (Element:IsA("GuiObject") and Element.ZIndex or 1) + 5
+                InstanceNew("UICorner", Overlay).CornerRadius = UDimNew(0, 6)
+                Overlay.Parent = Element
+                local Flash = TweenService:Create(Overlay, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 2, true), {BackgroundTransparency = 0.75})
+                Flash:Play()
+                task_delay(1.1, function() if Overlay then Overlay:Destroy() end end)
+            end
+
+            function Search:Close()
+                if not Search.IsOpen then return end
+                Search.IsOpen = false
+                SBox:ReleaseFocus()
+                SearchUI.Dim.Instance.Visible = false
+                SearchUI.Panel.Instance.Visible = false
+                SearchUI.Toast.Instance.Visible = false
+            end
+
+            function Search:Open()
+                if Search.IsOpen then
+                    SBox:CaptureFocus()
+                    return
+                end
+                Search.IsOpen = true
+                SearchUI.Dim.Instance.Visible = true
+                SearchUI.Panel.Instance.Visible = true
+                SearchUI.Scale.Instance.Scale = 0.94
+                TweenService:Create(SearchUI.Scale.Instance, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Scale = 1}):Play()
+                Search.Sel = 1
+                RunSearch()
+                task.defer(function() if Search.IsOpen then SBox:CaptureFocus() end end)
+            end
+
+            function Search:Toggle()
+                if Search.IsOpen then Search:Close() else Search:Open() end
+            end
+
+            local function GoTo(d)
+                Search:Close()
+                if not Window.IsOpen then Window:SetOpen(true) end
+                if d.Page then
+                    for _, P in ipairs(Window.Pages) do P:Turn(P == d.Page) end
+                    if d.SubTab and d.Page.SubTabs then
+                        for _, Tab in ipairs(d.Page.SubTabs) do Tab:Turn(Tab == d.SubTab) end
+                    end
+                end
+                task_delay(0.35, function()
+                    local Element = d.Element
+                    if not (Element and Element.Parent) then return end
+                    local Scroll = Element:FindFirstAncestorWhichIsA("ScrollingFrame")
+                    if Scroll then
+                        local Scale = (Window.ScaleObj and Window.ScaleObj.Scale) or 1
+                        local Offset = (Element.AbsolutePosition.Y - Scroll.AbsolutePosition.Y) / Scale + Scroll.CanvasPosition.Y - 20
+                        TweenService:Create(Scroll, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {CanvasPosition = Vector2New(0, MathMax(0, Offset))}):Play()
+                    end
+                    task_delay(0.3, function() FlashElement(Element) end)
+                end)
+            end
+
+            local function Act(Index, ForceGoTo)
+                local R = Search.Results[Index]
+                if not R then return end
+                local d = R.d
+                PushRecent(R.key)
+
+                if not ForceGoTo and d.Kind == "toggle" and d.Api then
+                    if d.Api.Locked then
+                        SearchToast(d.Name .. " está bloqueado")
+                    else
+                        d.Api:Set(not d.Api.Value)
+                        SearchToast(d.Name .. (d.Api.Value and " ligado" or " desligado"), d.Api.Value and "ok" or nil)
+                    end
+                elseif not ForceGoTo and d.Kind == "button" and d.Api then
+                    Library:SafeCall(d.Api.Callback)
+                    SearchToast(d.Name .. " executado", "ok")
+                else
+                    GoTo(d)
+                    return
+                end
+
+                Paint()
+                FlashRow(Rows[Index])
+            end
+
+            -- chips de filtro
+            local FilterChips = {}
+            local function StyleChip(Chip, On)
+                Chip.TextColor3 = On and Library.Theme.Accent or MUTED
+            end
+            local function MakeChip(Text, Order)
+                local Chip = Instances:Create("TextButton", {
+                    Parent = SChips.Instance,
+                    LayoutOrder = Order,
+                    Size = UDim2New(0, 0, 0, 22),
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    BackgroundColor3 = Library.Theme.Inline,
+                    Text = Text,
+                    TextColor3 = MUTED,
+                    FontFace = Library.Font,
+                    TextSize = 11,
+                    AutoButtonColor = false,
+                    ZIndex = Z(3)
+                }):AddToTheme({BackgroundColor3 = 'Inline'})
+                Instances:Create("UICorner", { Parent = Chip.Instance, CornerRadius = UDimNew(0, 5) })
+                Instances:Create("UIPadding", { Parent = Chip.Instance, PaddingLeft = UDimNew(0, 9), PaddingRight = UDimNew(0, 9) })
+                return Chip
+            end
+
+            for Order, Filter in ipairs({"#toggle", "#button", "#slider", "#dropdown", "@risk"}) do
+                local Chip = MakeChip(Filter, Order)
+                FilterChips[Filter] = Chip.Instance
+                Chip:Connect("MouseButton1Click", function()
+                    local Text = SBox.Text
+                    local S, E = StringFind(Text, Filter, 1, true)
+                    if S then
+                        Text = (Text:sub(1, S - 1) .. Text:sub(E + 1)):gsub("%s+", " "):gsub("^%s+", "")
+                    else
+                        Text = (Text .. " " .. Filter):gsub("^%s+", "") .. " "
+                    end
+                    SBox.Text = Text
+                    SBox:CaptureFocus()
+                end)
+            end
+
+            local FavChip = MakeChip("★ favoritos", 10)
+            FavChip:Connect("MouseButton1Click", function()
+                Search.FavoritesOnly = not Search.FavoritesOnly
+                StyleChip(FavChip.Instance, Search.FavoritesOnly)
+                Search.Sel = 1
+                RunSearch()
+                SBox:CaptureFocus()
+            end)
+
+            for Index, Row in ipairs(Rows) do
+                Row.Frame.MouseEnter:Connect(function()
+                    if Search.Sel ~= Index then Search.Sel = Index; Paint() end
+                end)
+                Row.Frame.MouseButton1Click:Connect(function() Search.Sel = Index; Act(Index, true) end)
+                Row.Switch.MouseButton1Click:Connect(function() Search.Sel = Index; Act(Index, false) end)
+                Row.Run.MouseButton1Click:Connect(function() Search.Sel = Index; Act(Index, false) end)
+                Row.Star.MouseButton1Click:Connect(function()
+                    local R = Search.Results[Index]
+                    if not R then return end
+                    Search.Favorites[R.key] = (not Search.Favorites[R.key]) or nil
+                    SaveSearchPrefs()
+                    SearchToast(R.d.Name .. (Search.Favorites[R.key] and " favoritado" or " removido dos favoritos"))
+                    RunSearch()
+                end)
+            end
+
+            local function CompleteTab()
+                local Text = SBox.Text
+                local Fragment = Text:match("#(%a*)$")
+                if Fragment then
+                    local NFragment = SearchNormalize(Fragment)
+                    for _, Option in ipairs({"toggle", "button", "slider", "dropdown", "input", "keybind", "colorpicker", "paragraph", "label"}) do
+                        if Option:sub(1, #NFragment) == NFragment then
+                            SBox.Text = Text:sub(1, #Text - #Fragment) .. Option .. " "
+                            SBox.CursorPosition = #SBox.Text + 1
+                            return
+                        end
+                    end
+                    return
+                end
+                Fragment = Text:match(">(%S*)$")
+                if Fragment then
+                    local NFragment = SearchNormalize(Fragment)
+                    for _, P in ipairs(Window.Pages) do
+                        local PageName = tostring(P.Name or "")
+                        if PageName ~= "" and not StringFind(PageName, " ", 1, true) and SearchNormalize(PageName):sub(1, #NFragment) == NFragment then
+                            SBox.Text = Text:sub(1, #Text - #Fragment) .. PageName .. " "
+                            SBox.CursorPosition = #SBox.Text + 1
+                            return
+                        end
+                    end
+                end
+            end
+
+            SBox:GetPropertyChangedSignal("Text"):Connect(function()
+                -- a TextBox pode inserir \t quando o Tab é usado pra completar
+                if StringFind(SBox.Text, "\t", 1, true) then
+                    SBox.Text = SBox.Text:gsub("\t", "")
+                    return
+                end
+                for Filter, Chip in pairs(FilterChips) do
+                    StyleChip(Chip, StringFind(SBox.Text, Filter, 1, true) ~= nil)
+                end
+                Search.Sel = 1
+                if Search.IsOpen then RunSearch() end
+            end)
+
+            SBox.FocusLost:Connect(function(EnterPressed)
+                if not EnterPressed or not Search.IsOpen then return end
+                local Shift = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+                Act(Search.Sel, Shift)
+                task.defer(function() if Search.IsOpen then SBox:CaptureFocus() end end)
+            end)
+
+            Items["SearchContainer"]:Connect("MouseButton1Click", function() Search:Open() end)
+            SearchUI.Dim:Connect("MouseButton1Click", function() Search:Close() end)
+
+            Library:Connect(UserInputService.InputBegan, function(Input)
+                if Input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                local Ctrl = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+
+                if Ctrl and Input.KeyCode == Search.Key then
+                    local Focused = UserInputService:GetFocusedTextBox()
+                    if Focused and Focused ~= SBox then return end -- digitando em outro lugar (chat etc.)
+                    Search:Toggle()
+                    return
+                end
+                if not Search.IsOpen then return end
+
+                if SBox:IsFocused() then
+                    if Input.KeyCode == Enum.KeyCode.Tab then
+                        task.defer(CompleteTab) -- depois da TextBox processar a tecla
+                        return
+                    end
+                    if Ctrl and Input.KeyCode == Enum.KeyCode.Backspace then
+                        -- guarda o texto antes e aplica depois: funciona com ou sem o Ctrl+Backspace nativo
+                        local Before = SBox.Text
+                        task.defer(function() SBox.Text = (Before:gsub("%S+%s*$", "")) end)
+                        return
+                    end
+                end
+
+                if Input.KeyCode == Enum.KeyCode.Down then
+                    Search.Sel = MathMin(Search.Sel + 1, MathMax(#Search.Results, 1)); Paint(); ScrollToSel()
+                elseif Input.KeyCode == Enum.KeyCode.Up then
+                    Search.Sel = MathMax(Search.Sel - 1, 1); Paint(); ScrollToSel()
+                elseif Input.KeyCode == Enum.KeyCode.Escape then
+                    if SBox.Text ~= "" then SBox.Text = "" else Search:Close() end
+                end
+            end)
+
+            function Window:OpenSearch() Search:Open() end
+            function Window:CloseSearch() Search:Close() end
+            function Window:ToggleSearch() Search:Toggle() end
             
             Items["Pages"] = Instances:Create("ScrollingFrame", {
                 Parent = Items["Sidebar"].Instance,
@@ -3645,7 +4243,7 @@ do
 
         Library:QueueInitialCallback(Toggle, Toggle.Callback, function() return { Toggle.Value } end)
         
-        Toggle.Section.Window:RegisterElement(Items["Toggle"].Instance, "Toggle", Toggle.Name, Toggle.Section, Toggle.Page)
+        Toggle.Section.Window:RegisterElement(Items["Toggle"].Instance, "Toggle", Toggle.Name, Toggle.Section, Toggle.Page, Toggle, Data.Badge)
         return Toggle 
     end
 
@@ -3688,7 +4286,7 @@ do
             Items["Main"]:Clean()
         end
 
-        Button.Section.Window:RegisterElement(Items["Main"].Instance, "Button", Button.Name, Button.Section, Button.Section.Page)
+        Button.Section.Window:RegisterElement(Items["Main"].Instance, "Button", Button.Name, Button.Section, Button.Section.Page, Button, Data.Badge)
         return Button
     end
 
@@ -3846,7 +4444,7 @@ do
 
         Library:CreateBadge(Items["Text"].Instance, Data)
 
-        Slider.Section.Window:RegisterElement(Items["Main"].Instance, "Slider", Slider.Name, Slider.Section, Slider.Section.Page)
+        Slider.Section.Window:RegisterElement(Items["Main"].Instance, "Slider", Slider.Name, Slider.Section, Slider.Section.Page, Slider, Data.Badge)
         return Slider 
     end
 
@@ -4155,7 +4753,7 @@ do
             Items["Main"]:Clean()
         end
         
-        Dropdown.Section.Window:RegisterElement(Items["Main"].Instance, "Dropdown", Dropdown.Name, Dropdown.Section, Dropdown.Section.Page)
+        Dropdown.Section.Window:RegisterElement(Items["Main"].Instance, "Dropdown", Dropdown.Name, Dropdown.Section, Dropdown.Section.Page, Dropdown, Data.Badge)
         return Dropdown 
     end
 
@@ -4251,7 +4849,7 @@ do
 
         Library:CreateBadge(Items["Text"].Instance, Data)
 
-        Input.Section.Window:RegisterElement(Items["Main"].Instance, "Input", Input.Name, Input.Section, Input.Section.Page)
+        Input.Section.Window:RegisterElement(Items["Main"].Instance, "Input", Input.Name, Input.Section, Input.Section.Page, Input, Data.Badge)
         return Input
     end
 
@@ -4314,7 +4912,7 @@ do
             Items["Main"]:Clean()
         end
 
-        Paragraph.Section.Window:RegisterElement(Items["Main"].Instance, "Paragraph", Paragraph.Title, Paragraph.Section, Paragraph.Section.Page)
+        Paragraph.Section.Window:RegisterElement(Items["Main"].Instance, "Paragraph", Paragraph.Title, Paragraph.Section, Paragraph.Section.Page, Paragraph, Data.Badge)
         return Paragraph
     end
 
@@ -4347,7 +4945,7 @@ do
             Items["Main"]:Clean()
         end
 
-        Keybind.Section.Window:RegisterElement(Items["Main"].Instance, "Keybind", Keybind.Name, Keybind.Section, Keybind.Section.Page)
+        Keybind.Section.Window:RegisterElement(Items["Main"].Instance, "Keybind", Keybind.Name, Keybind.Section, Keybind.Section.Page, Keybind, Data.Badge)
         return Keybind
     end
 
@@ -4380,7 +4978,7 @@ do
             Items["Main"]:Clean()
         end
 
-        Colorpicker.Section.Window:RegisterElement(Items["Main"].Instance, "Colorpicker", Colorpicker.Name, Colorpicker.Section, Colorpicker.Section.Page)
+        Colorpicker.Section.Window:RegisterElement(Items["Main"].Instance, "Colorpicker", Colorpicker.Name, Colorpicker.Section, Colorpicker.Section.Page, Colorpicker, Data.Badge)
         return Colorpicker
     end
 
@@ -4411,7 +5009,7 @@ do
             l:Clean()
         end
 
-        Label.Section.Window:RegisterElement(l.Instance, "Label", Label.Text, Label.Section, Label.Section.Page)
+        Label.Section.Window:RegisterElement(l.Instance, "Label", Label.Text, Label.Section, Label.Section.Page, Label, LabelData and LabelData.Badge)
         return Label
     end
 
