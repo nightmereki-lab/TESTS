@@ -54,7 +54,9 @@ local CONFIG = {
     COMBO_MAX_TENTATIVAS = 6,
     TRANSFORMAR_INTERVALO = {0.95, 1.3}, -- barra cheia: aperta 1 a cada ~1s
     MORRER_SEM_LANCA      = true,        -- sem lanca + barra nao cheia -> para tudo e deixa morrer
-    SEM_LANCA_ESPERA      = 3,           -- segundos com 0 lancas antes de desistir (evita falso alarme)
+    SEM_LANCA_ESPERA      = 20,          -- sem lanca: continua flipando/segurando no ar esse tempo antes de
+                                         -- desistir (a barra ainda pode encher depois que as lancas acabam)
+    TRANSFORMAR_CONFIRMA  = 1.5,         -- depois de apertar 1, espera isso pra ver se virou titan
 
     -- Skills TITAN (Colossal). NUNCA a 5 (sai do titan)
     TITAN_ABERTURA  = {4, 1, 3},
@@ -290,7 +292,10 @@ local function checarMorrer()
     local char = LP.Character
     local n = char and char:GetAttribute("Spears")
     if chegou() and type(n) == "number" and n <= 0 and not barraCheia() and not transformado() then
-        semLancaDesde = semLancaDesde or os.clock()
+        if not semLancaDesde then
+            semLancaDesde = os.clock()
+            status(("Lancas acabaram: segurando no ar flipando por %ds esperando a barra"):format(CONFIG.SEM_LANCA_ESPERA))
+        end
         if os.clock() - semLancaDesde >= CONFIG.SEM_LANCA_ESPERA then
             modoMorrer = true
             status("Sem lanca e barra nao cheia: parei tudo, deixando morrer pra recomecar")
@@ -315,6 +320,9 @@ STATE.connect(RunService.Heartbeat, function()
             if mover(hrp, topo, CONFIG.VELOCIDADE) then
                 shiftEtapa = "caindo"; status("No ponto inicial, caindo pra transformar")
             end
+        elseif alturaDoChao(hrp) < CONFIG.ALTURA_MINIMA then
+            -- caiu ate perto do chao e NAO transformou: volta pro ponto e tenta de novo (nao larga no chao)
+            shiftEtapa = "indo"; status("Nao transformou na queda, voltando pro ponto pra tentar de novo")
         end
         return -- "caindo": nao segura nada, so cai (o loop de skills aperta o 1)
     end
@@ -405,13 +413,14 @@ protegido("flips", function()
 end)
 
 -- ================= SKILLS =================
--- solta a trava logo depois de cada tecla: os flips continuam no meio do combo (nao fica parado caindo)
+-- durante o combo a trava fica presa: buffs -> 3 -> 2 saem inteiros, sem flip no meio
+local emCombo = false
 local function usar(n)
     while tocandoFlip and vivo() do task.wait() end
     usandoSkill = true
     task.wait(rand(0.05, 0.12)) -- reacao humana
     tocar(n)
-    usandoSkill = false
+    if not emCombo then usandoSkill = false end
 end
 
 -- aperta e confirma que saiu (entrou em cooldown); se o jogo ignorou (animacao da anterior), tenta de novo
@@ -447,6 +456,8 @@ local function tentarComboHumano()
     if not todasProntas(seq) then return end -- algo em cooldown: espera (nao gasta buff sozinho)
 
     status(("Combo (%d lancas): %s"):format(l, table.concat(seq, " -> ")))
+    while tocandoFlip and vivo() do task.wait() end
+    emCombo, usandoSkill = true, true -- segura os flips ate o combo acabar
     local ok, err = pcall(function()
         for i, n in ipairs(seq) do
             if not podeSeguir() then break end
@@ -456,12 +467,13 @@ local function tentarComboHumano()
             if i < #seq then task.wait(rand(CONFIG.COMBO_PAUSA[1], CONFIG.COMBO_PAUSA[2])) end
         end
     end)
-    usandoSkill = false -- sempre libera os flips, mesmo se deu erro
+    emCombo, usandoSkill = false, false -- sempre libera os flips, mesmo se deu erro
     if not ok then error(err) end
 end
 
 -- ================= LOOP 2: SKILLS / TRANSFORMAR =================
 local proxTransformar, proxTitan = 0, 0
+local tentativasShift = 0
 local eraTitan, aberturaIdx = false, 1
 protegido("skills", function()
     task.wait(rand(0.2, 0.35))
@@ -480,8 +492,24 @@ protegido("skills", function()
     if not titan and (modoShift or barraCheia()) then
         -- so aperta o 1 depois de chegar no ponto inicial e soltar (caindo)
         if modoShift and shiftEtapa == "caindo" and os.clock() >= proxTransformar then
-            proxTransformar = os.clock() + rand(CONFIG.TRANSFORMAR_INTERVALO[1], CONFIG.TRANSFORMAR_INTERVALO[2])
+            tentativasShift += 1
+            status(("Apertando %d pra transformar (tentativa %d)"):format(CONFIG.SKILL_TRANSFORMAR, tentativasShift))
             usar(CONFIG.SKILL_TRANSFORMAR)
+            -- verificacao: confere se virou titan antes de apertar de novo
+            local t = os.clock()
+            while os.clock() - t < CONFIG.TRANSFORMAR_CONFIRMA and vivo() do
+                if transformado() then break end
+                task.wait(0.1)
+            end
+            if transformado() then
+                status(("Transformou na tentativa %d"):format(tentativasShift))
+                tentativasShift = 0
+            elseif not barraCheia() then
+                -- a barra esvaziou sem transformar: sai do modo shift e volta ao ciclo normal
+                status("Barra nao ta mais cheia e nao transformou, voltando ao ciclo normal")
+                modoShift, tentativasShift = false, 0
+            end
+            proxTransformar = os.clock() + rand(0.3, 0.6) -- a confirmacao ja esperou ~1.5s
         end
 
     elseif titan then
