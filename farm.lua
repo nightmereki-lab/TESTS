@@ -12,6 +12,7 @@
 
     Seguranca:
     - So executa no place PLACE_ID (Outskirts).
+    - queue_on_teleport: depois de cada teleporte ele se carrega sozinho de novo (pelo loadstring do GitHub).
     - So aperta tecla com a janela do Roblox em foco.
     - Para sozinho em qualquer sinal de warn/flag (atributo, tela, remote POST, chat de sistema). 1 ja basta.
     - Tecla END desliga tudo na hora (kill switch).
@@ -74,6 +75,19 @@ local UIS        = game:GetService("UserInputService")
 local VIM        = game:GetService("VirtualInputManager")
 local LP         = Players.LocalPlayer
 while not LP do task.wait(0.5); LP = Players.LocalPlayer end -- jogo ainda carregando
+
+-- Queue teleport: no proximo teleporte (recomecar partida, lobby -> missao) o script roda sozinho de novo.
+-- Fica ANTES da trava de place: assim ate no lobby ele ja deixa agendado pra quando entrar na missao.
+do
+    local SCRIPT_URL = "https://raw.githubusercontent.com/nightmereki-lab/TESTS/refs/heads/main/farm.lua"
+    local queue = queue_on_teleport or queueonteleport or queue_on_tp
+        or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+    local genv = getgenv and getgenv() or _G
+    if queue and not genv.__ffQueued then
+        genv.__ffQueued = true
+        pcall(queue, ('loadstring(game:HttpGet("%s"))()'):format(SCRIPT_URL))
+    end
+end
 
 -- Trava de place: fora do Outskirts o script nao faz nada (nem voa, nem aperta tecla)
 if game.PlaceId ~= CONFIG.PLACE_ID then
