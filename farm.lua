@@ -7,7 +7,9 @@
     4. Skills nas SUBIDAS de volta, alternando: uma subida usa os buffs (4, 5), cai, a subida seguinte
        usa o ataque (3 -> 2, se sobrar lanca), e repete. So gasta buff se o ataque tambem estiver pronto.
     5. Barra de shift cheia -> para os flips e aperta 1 a cada ~1s ate virar titan.
-    6. Titan (Colossal): abre com 4 -> 1 -> 3, depois um ataque atras do outro. Nunca a 5.
+    6. Titan (Colossal): abre com 4 -> 1 -> 3, depois um ataque atras do outro. Nunca a 5 durante a partida.
+    6b. Tela "MISSION COMPLETED" (ou "RAID COMPLETED") apareceu -> para flips e skills, e se estiver de
+        titan aperta 5 pra sair (confere se saiu antes de apertar de novo). So nessa tela.
     7. Acabaram as lancas e a barra NAO ta cheia -> para tudo e deixa morrer (pro auto click recomecar).
        (lancas acabaram mas a barra ta cheia -> transforma normal)
 
@@ -64,6 +66,13 @@ local CONFIG = {
     TITAN_ABERTURA  = {4, 1, 3},
     TITAN_SKILLS    = {1, 2, 3, 4},
     TITAN_INTERVALO = {0.3, 0.6}, -- um ataque seguido do outro
+
+    -- Fim da missao: tela "MISSION COMPLETED" apareceu -> para flips/skills e aperta 5 pra sair do titan
+    -- (a 5 SO e usada aqui, nunca durante a partida)
+    SAIR_TITAN_NO_FIM     = true,
+    SKILL_SAIR_TITAN      = 5,
+    SAIR_TITAN_CONFIRMA   = 2,    -- depois de apertar 5, espera isso (s) pra ver se saiu do titan
+    SAIR_TITAN_TENTATIVAS = 5,
 
     TECLA_DESLIGAR = Enum.KeyCode.End, -- kill switch
     DEBUG = true,                       -- mensagens [FlyFarm] no console (F9)
@@ -278,6 +287,48 @@ local function escolherSkill(lista)
     return #prontas > 0 and prontas[math.random(#prontas)] or nil
 end
 
+-- ================= FIM DA MISSAO =================
+-- O jogo mostra "MISSION COMPLETED" (ou "RAID COMPLETED") no PlayerGui quando a partida acaba.
+local TITULOS_FIM = { ["MISSION COMPLETED"] = true, ["RAID COMPLETED"] = true }
+local fimDeMissao = false -- tela de complete aparecendo: flips e skills param
+
+local function textoLimpo(obj)
+    local t = obj.ContentText ~= "" and obj.ContentText or obj.Text
+    t = t:gsub("<[^>]->", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return t:upper()
+end
+
+local function guiVisivel(obj)
+    local cur = obj
+    while cur and cur ~= LP.PlayerGui do
+        if cur:IsA("GuiObject") and not cur.Visible then return false end
+        if cur:IsA("ScreenGui") and not cur.Enabled then return false end
+        cur = cur.Parent
+    end
+    return cur ~= nil and obj.AbsoluteSize.X > 0 and obj.AbsoluteSize.Y > 0
+end
+
+-- guarda o titulo achado; varre o PlayerGui no maximo 1x por segundo
+local tituloFim, ultimaVarredura = nil, 0
+local function telaDeCompleteAberta()
+    if tituloFim and tituloFim.Parent and guiVisivel(tituloFim) and TITULOS_FIM[textoLimpo(tituloFim)] then
+        return true
+    end
+    -- o guardado sumiu ou esta escondido: procura de novo (o jogo pode criar uma tela nova por partida)
+    if os.clock() - ultimaVarredura < 1 then return false end
+    ultimaVarredura = os.clock()
+    local gui = LP:FindFirstChildOfClass("PlayerGui")
+    if not gui then return false end
+    for i, d in ipairs(gui:GetDescendants()) do
+        if i % 800 == 0 then task.wait() end
+        if (d:IsA("TextLabel") or d:IsA("TextButton")) and TITULOS_FIM[textoLimpo(d)] and guiVisivel(d) then
+            tituloFim = d
+            return true
+        end
+    end
+    return false
+end
+
 -- ================= ESTADO =================
 local alvoPos  = CONFIG.ALVO.Position
 local topo     = alvoPos + Vector3.new(0, CONFIG.ALTURA, 0) -- onde fica flipando (400)
@@ -392,6 +443,7 @@ local function esperaFlip()
     task.wait(math.max(0.3, CONFIG.FLIP_INTERVALO + rand(-CONFIG.FLIP_VARIACAO, CONFIG.FLIP_VARIACAO)))
 end
 protegido("flips", function()
+    if fimDeMissao then task.wait(0.3) return end -- missao acabou: nao flipa mais
     if barraCheia() and not modoShift and not transformado() then
         modoShift, shiftEtapa = true, "indo"
         status("Barra cheia: parei os flips, indo pro ponto inicial pra transformar")
@@ -458,7 +510,7 @@ local function usarConfirmado(n)
 end
 
 local function podeSeguir()
-    return vivo() and not modoShift and not modoMorrer and not transformado() and chegou()
+    return vivo() and not fimDeMissao and not modoShift and not modoMorrer and not transformado() and chegou()
         and getRoot() ~= nil and emFoco()
 end
 
@@ -512,6 +564,7 @@ local tentativasShift = 0
 local eraTitan, aberturaIdx = false, 1
 protegido("skills", function()
     task.wait(rand(0.2, 0.35))
+    if fimDeMissao then return end -- missao acabou: o loop do fim cuida do 5
     if modoMorrer then return end -- nao usa skill nenhuma, so espera morrer
     if not (chegou() and getRoot() and emFoco()) then return end
 
@@ -566,6 +619,43 @@ protegido("skills", function()
     elseif CONFIG.USAR_SKILLS then
         -- combo humano na SUBIDA de volta: uma subida buffs, a seguinte ataque (3 -> 2)
         if fase == "voltando" then tentarComboHumano() end
+    end
+end)
+
+-- ================= LOOP 3: FIM DA MISSAO =================
+-- Tela "MISSION COMPLETED" apareceu: para flips/skills e, se estiver de titan, aperta 5 pra sair.
+-- A 5 so e apertada aqui, e so com essa tela aberta.
+local tentativasSair = 0
+protegido("fim", function()
+    task.wait(0.3)
+    local aberta = telaDeCompleteAberta()
+    if aberta and not fimDeMissao then
+        fimDeMissao, tentativasSair = true, 0
+        status("Missao completa: parei flips e skills")
+    elseif not aberta and fimDeMissao then
+        fimDeMissao = false
+        status("Tela de complete fechou")
+    end
+
+    if not (fimDeMissao and CONFIG.SAIR_TITAN_NO_FIM and transformado()) then return end
+    if tentativasSair >= CONFIG.SAIR_TITAN_TENTATIVAS or not (vivo() and emFoco()) then return end
+
+    while (tocandoFlip or usandoSkill) and vivo() do task.wait() end -- espera tecla que ja tava saindo
+    tentativasSair += 1
+    status(("Missao completa: apertando %d pra sair do titan (tentativa %d)"):format(CONFIG.SKILL_SAIR_TITAN, tentativasSair))
+    task.wait(rand(0.15, 0.35)) -- reacao humana
+    tocar(tostring(CONFIG.SKILL_SAIR_TITAN))
+
+    -- confirma que saiu antes de apertar de novo
+    local t = os.clock()
+    while os.clock() - t < CONFIG.SAIR_TITAN_CONFIRMA and vivo() do
+        if not transformado() then break end
+        task.wait(0.1)
+    end
+    if not transformado() then
+        status("Saiu do titan")
+    elseif tentativasSair >= CONFIG.SAIR_TITAN_TENTATIVAS then
+        status(("Nao saiu do titan depois de %d tentativas, parei de apertar"):format(tentativasSair))
     end
 end)
 
