@@ -12,6 +12,8 @@
         titan aperta 5 pra sair (confere se saiu antes de apertar de novo). So nessa tela.
     7. Acabaram as lancas e a barra NAO ta cheia -> para tudo e deixa morrer (pro auto click recomecar).
        (lancas acabaram mas a barra ta cheia -> transforma normal)
+    8. Transformacao acabou e a missao NAO completou (sobrou titan) -> voa ate o titan que sobrou e se
+       joga nele pra morrer e reiniciar.
 
     Seguranca:
     - So executa no place PLACE_ID (Outskirts).
@@ -73,6 +75,11 @@ local CONFIG = {
     SKILL_SAIR_TITAN      = 5,
     SAIR_TITAN_CONFIRMA   = 2,    -- depois de apertar 5, espera isso (s) pra ver se saiu do titan
     SAIR_TITAN_TENTATIVAS = 5,
+
+    -- Transformacao acabou e a missao NAO completou (sobrou titan): voa ate o titan que sobrou e se joga
+    -- nele pra morrer e o auto click reiniciar
+    CACAR_TITAN_DEPOIS_DO_SHIFT = true,
+    VELOCIDADE_CACAR            = 70,
 
     TECLA_DESLIGAR = Enum.KeyCode.End, -- kill switch
     DEBUG = true,                       -- mensagens [FlyFarm] no console (F9)
@@ -193,6 +200,42 @@ local function alturaDoChao(hrp)
     local hit = workspace:Raycast(hrp.Position, Vector3.new(0, -2000, 0), rayParams)
     ultimaAltura = hit and (hrp.Position.Y - hit.Position.Y) or math.huge
     return ultimaAltura
+end
+
+-- ================= ACHAR TITAN VIVO (mesma deteccao do aot r.lua) =================
+-- Titans ficam em workspace.Titans. Titan de verdade = Model com Humanoid vivo e hitbox de nuca
+-- (Hitboxes.Hit.Nape). Pega o mais perto pela nuca e devolve a parte do corpo pra onde voar.
+local function napeOf(titan)
+    local hb = titan:FindFirstChild("Hitboxes")
+    local hit = hb and hb:FindFirstChild("Hit")
+    local nape = hit and hit:FindFirstChild("Nape")
+    if nape and nape:IsA("BasePart") then return nape end
+    return nil
+end
+
+local function titanAlive(titan)
+    local hum = titan and titan.Parent and titan:FindFirstChildOfClass("Humanoid")
+    return hum ~= nil and hum.Health > 0
+end
+
+local function acharTitan(hrp)
+    local pasta = workspace:FindFirstChild("Titans")
+    if not pasta then return nil end
+    local melhor, melhorDist = nil, math.huge
+    for _, t in ipairs(pasta:GetChildren()) do
+        if t:IsA("Model") and titanAlive(t) then
+            local nape = napeOf(t)
+            if nape then
+                local d = (nape.Position - hrp.Position).Magnitude
+                if d < melhorDist then
+                    -- voa pro corpo (onde ele pega/bate), nao pra nuca
+                    melhor = t:FindFirstChild("HumanoidRootPart") or t.PrimaryPart or nape
+                    melhorDist = d
+                end
+            end
+        end
+    end
+    return melhor, melhorDist
 end
 
 -- ================= MOVIMENTO (fisica, nao teleporte) =================
@@ -344,6 +387,8 @@ local modoShift   = false -- barra cheia: sem flip, vai pro ponto inicial e cai 
 local shiftEtapa  = "indo" -- "indo" = voltando pro ponto inicial; "caindo" = solto, apertando 1
 local modoMorrer  = false -- sem lanca + barra nao cheia: nao faz mais nada, deixa morrer
 local semLancaDesde = nil
+local modoCacar   = false -- saiu do titan sem a missao completar: vai se jogar no titan que sobrou
+local eraTitan    = false -- (fica aqui em cima porque o Heartbeat e o respawn tambem usam)
 
 local function chegou() return fase == "flipando" or fase == "voltando" end
 
@@ -378,6 +423,21 @@ STATE.connect(RunService.Heartbeat, function()
     if parado then return end
     local char, hrp = getRoot()
     if not char then return end
+
+    -- Saiu do titan sem a missao completar: voa ate o titan que sobrou e se joga nele (pra morrer e reiniciar)
+    if modoCacar then
+        if fimDeMissao or transformado() then
+            modoCacar = false; status("Missao completou (ou transformou de novo), parei de ir no titan")
+        else
+            local alvo = acharTitan(hrp)
+            if alvo then
+                -- mira no corpo do titan e continua empurrando: encosta nele e ele pega/mata
+                mover(hrp, alvo.Position, CONFIG.VELOCIDADE_CACAR)
+            end
+            -- sem titan achado: nao segura nada, so cai
+        end
+        return
+    end
 
     checarMorrer()
     if modoMorrer then return end -- nao segura mais nada: cai e morre
@@ -450,7 +510,7 @@ protegido("flips", function()
     end
 
     local _, hrp = getRoot()
-    if not (chegou() and hrp and emFoco() and not modoShift and not modoMorrer) then
+    if not (chegou() and hrp and emFoco() and not modoShift and not modoMorrer and not modoCacar) then
         task.wait(0.2)
         return
     end
@@ -561,14 +621,21 @@ end
 -- ================= LOOP 2: SKILLS / TRANSFORMAR =================
 local proxTransformar, proxTitan = 0, 0
 local tentativasShift = 0
-local eraTitan, aberturaIdx = false, 1
+local aberturaIdx = 1
 protegido("skills", function()
     task.wait(rand(0.2, 0.35))
     if fimDeMissao then return end -- missao acabou: o loop do fim cuida do 5
     if modoMorrer then return end -- nao usa skill nenhuma, so espera morrer
+    if modoCacar then return end  -- indo se jogar no titan: sem skill
     if not (chegou() and getRoot() and emFoco()) then return end
 
     local titan = transformado()
+    if not titan and eraTitan and not fimDeMissao and CONFIG.CACAR_TITAN_DEPOIS_DO_SHIFT then
+        eraTitan = false
+        modoCacar = true
+        status("Transformacao acabou e a missao nao completou: indo me jogar no titan que sobrou")
+        return
+    end
     if titan and not eraTitan then
         modoShift = false
         aberturaIdx = 1
@@ -791,10 +858,19 @@ end)
 STATE.connect(LP.CharacterAdded, function()
     task.wait(1)
     if parado or transformado() then return end
+    -- voltou a ser humano depois do titan (personagem novo) e a missao nao completou -> vai se jogar no titan
+    local saiuDoTitan = eraTitan and not fimDeMissao and CONFIG.CACAR_TITAN_DEPOIS_DO_SHIFT
     modoShift, usandoSkill, tocandoFlip, eraTitan = false, false, false, false
     shiftEtapa = "indo"
     modoMorrer, semLancaDesde = false, nil
-    fase = "subindo"; status("Renasceu, recomecando")
+    if saiuDoTitan then
+        modoCacar = true
+        fase = "flipando" -- conta como "ja chegou" (nao refaz a viagem)
+        status("Saiu do titan e a missao nao completou: indo me jogar no titan que sobrou")
+    else
+        modoCacar = false
+        fase = "subindo"; status("Renasceu, recomecando")
+    end
 end)
 
 STATE.onCleanup(function()
