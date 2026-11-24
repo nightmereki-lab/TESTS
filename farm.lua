@@ -2,9 +2,10 @@
     AoTR - Fly Farm (Awakening bar)
     1. Sobe ate 500 e voa (por fisica, sem teleporte) ate ficar em cima do alvo.
     2. Em cima do alvo, desce pra ALTURA.
-    3. Perto de ALTURA: flip do jogo (D D / A A). Abaixo disso cai SEM flip ate ALTURA - QUEDA, usando skill
-       (mais perto dos titans pras skills chegarem). Ai sobe de volta pra ALTURA e volta a flipar.
-    4. Combo de skills (buffs -> 3 -> 2) so durante a QUEDA, mais perto dos titans.
+    3. Perto de ALTURA: flip do jogo (D D / A A). Abaixo disso cai SEM flip ate ALTURA - QUEDA.
+       Ai sobe de volta pra ALTURA e volta a flipar.
+    4. Skills nas SUBIDAS de volta, alternando: uma subida usa os buffs (4, 5), cai, a subida seguinte
+       usa o ataque (3 -> 2, se sobrar lanca), e repete. So gasta buff se o ataque tambem estiver pronto.
     5. Barra de shift cheia -> para os flips e aperta 1 a cada ~1s ate virar titan.
     6. Titan (Colossal): abre com 4 -> 1 -> 3, depois um ataque atras do outro. Nunca a 5.
     7. Acabaram as lancas e a barra NAO ta cheia -> para tudo e deixa morrer (pro auto click recomecar).
@@ -36,8 +37,8 @@ local CONFIG = {
     TECLA_INTERVALO  = 0.08, -- tempo entre os dois toques do double tap
 
     -- Subida de volta
-    QUEDA            = 80,   -- cai sem flip (usando skill) ate ALTURA - QUEDA (250 -> 170),
-                             -- ai sobe de volta ate ALTURA e volta a flipar
+    QUEDA            = 80,   -- cai sem flip ate ALTURA - QUEDA (250 -> 170), ai sobe de volta ate
+                             -- ALTURA (usando skill na subida) e volta a flipar
     FAIXA_FLIP       = 8,    -- so flipa a ate 8 studs abaixo de ALTURA
     ALTURA_MINIMA    = 80,   -- seguranca: a menos disso do chao -> sobe tambem
     VELOCIDADE_SUBIR = 25,   -- studs/s na subida de volta (devagar = discreto)
@@ -286,6 +287,8 @@ local alvoSubida = topo.Y -- ate onde sobe na fase "voltando"
 
 local tocandoFlip = false -- no meio do double tap
 local usandoSkill = false -- no meio de uma skill (flip espera)
+local emCombo     = false -- etapa do combo rodando (segura os flips)
+local numSubida   = 0     -- conta as subidas de volta (cada uma usa uma etapa do combo)
 local modoShift   = false -- barra cheia: sem flip, vai pro ponto inicial e cai apertando 1
 local shiftEtapa  = "indo" -- "indo" = voltando pro ponto inicial; "caindo" = solto, apertando 1
 local modoMorrer  = false -- sem lanca + barra nao cheia: nao faz mais nada, deixa morrer
@@ -377,6 +380,7 @@ STATE.connect(RunService.Heartbeat, function()
         local caiu = hrp.Position.Y < topo.Y - CONFIG.QUEDA
         if caiu or alturaDoChao(hrp) < CONFIG.ALTURA_MINIMA then
             alvoSubida = topo.Y
+            numSubida += 1
             fase = "voltando"; status(("Caiu ate %d, voltando pra %d"):format(CONFIG.ALTURA - CONFIG.QUEDA, CONFIG.ALTURA))
         end
     end
@@ -428,7 +432,7 @@ end)
 
 -- ================= SKILLS =================
 -- durante o combo a trava fica presa: buffs -> 3 -> 2 saem inteiros, sem flip no meio
-local emCombo = false
+-- (emCombo fica la em cima, no ESTADO, porque o loop de movimento tambem usa)
 local function usar(n)
     while tocandoFlip and vivo() do task.wait() end
     usandoSkill = true
@@ -458,20 +462,36 @@ local function podeSeguir()
         and getRoot() ~= nil and emFoco()
 end
 
--- Combo humano: espera TUDO que vai usar ficar pronto, ai: buffs -> 3 -> 2 (se sobrar lanca)
+-- Combo humano em duas subidas:
+--   subida 1: buffs (4, 5)  ->  cai  ->  subida 2: ataque (3 -> 2, se sobrar lanca)  ->  repete
+-- So gasta buff se os ataques tambem estiverem prontos (pra eles sairem na subida seguinte).
+local etapaCombo  = "buff" -- o que a PROXIMA subida vai usar: "buff" ou "atk"
+local subidaUsada = 0      -- numero da ultima subida que ja usou skill (uma etapa por subida)
+
 local function tentarComboHumano()
+    if subidaUsada == numSubida then return end -- essa subida ja usou a etapa dela
     local l = lancas()
     if l < CONFIG.LANCAS_PEQUENO then return end -- sem lanca: so flipa
     local usarGrande = (l - CONFIG.LANCAS_PEQUENO) >= CONFIG.LANCAS_GRANDE
 
-    local seq = table.clone(CONFIG.SKILLS_BUFF)
-    seq[#seq + 1] = CONFIG.SKILL_ATK_PEQUENO
-    if usarGrande then seq[#seq + 1] = CONFIG.SKILL_ATK_GRANDE end
-    if not todasProntas(seq) then return end -- algo em cooldown: espera (nao gasta buff sozinho)
+    local ataque = {CONFIG.SKILL_ATK_PEQUENO}
+    if usarGrande then ataque[#ataque + 1] = CONFIG.SKILL_ATK_GRANDE end
 
-    status(("Combo (%d lancas): %s"):format(l, table.concat(seq, " -> ")))
+    local seq
+    if etapaCombo == "buff" then
+        local tudo = table.clone(CONFIG.SKILLS_BUFF)
+        for _, n in ipairs(ataque) do tudo[#tudo + 1] = n end
+        if not todasProntas(tudo) then return end -- algo em cooldown: espera (nao gasta buff sozinho)
+        seq = table.clone(CONFIG.SKILLS_BUFF)
+    else
+        if not todasProntas(ataque) then return end -- ataque em cooldown: tenta de novo na mesma subida
+        seq = ataque
+    end
+
+    subidaUsada = numSubida
+    status(("Subida %d, %s (%d lancas): %s"):format(numSubida, etapaCombo == "buff" and "buffs" or "ataque", l, table.concat(seq, " -> ")))
     while tocandoFlip and vivo() do task.wait() end
-    emCombo, usandoSkill = true, true -- segura os flips ate o combo acabar
+    emCombo, usandoSkill = true, true -- segura os flips ate a etapa acabar
     local ok, err = pcall(function()
         for i, n in ipairs(seq) do
             if not podeSeguir() then break end
@@ -483,6 +503,7 @@ local function tentarComboHumano()
     end)
     emCombo, usandoSkill = false, false -- sempre libera os flips, mesmo se deu erro
     if not ok then error(err) end
+    etapaCombo = etapaCombo == "buff" and "atk" or "buff" -- proxima subida faz a outra etapa
 end
 
 -- ================= LOOP 2: SKILLS / TRANSFORMAR =================
@@ -543,10 +564,8 @@ protegido("skills", function()
         end
 
     elseif CONFIG.USAR_SKILLS then
-        -- combo humano so na QUEDA (sem flip, descendo pros titans): buffs -> 3 -> 2
-        local _, hrp = getRoot()
-        local caindo = fase == "flipando" and hrp ~= nil and hrp.Position.Y < topo.Y - CONFIG.FAIXA_FLIP
-        if caindo then tentarComboHumano() end
+        -- combo humano na SUBIDA de volta: uma subida buffs, a seguinte ataque (3 -> 2)
+        if fase == "voltando" then tentarComboHumano() end
     end
 end)
 
