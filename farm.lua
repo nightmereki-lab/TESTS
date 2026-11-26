@@ -6,12 +6,13 @@
        Ai sobe de volta pra ALTURA e volta a flipar.
     4. Skills nas SUBIDAS de volta, alternando: uma subida usa os buffs (4, 5), cai, a subida seguinte
        usa o ataque (3 -> 2, se sobrar lanca), e repete. So gasta buff se o ataque tambem estiver pronto.
-    5. Barra de shift cheia -> para os flips e aperta 1 a cada ~1s ate virar titan.
+    5. Barra de shift a partir de BARRA_TRANSFORMAR (60%) -> para os flips, vai pro ponto inicial, cai e
+       aperta 1 ate virar titan (confere se virou antes de apertar de novo).
     6. Titan (Colossal): abre com 4 -> 1 -> 3, depois um ataque atras do outro. Nunca a 5 durante a partida.
     6b. Tela "MISSION COMPLETED" (ou "RAID COMPLETED") apareceu -> para flips e skills, e se estiver de
         titan aperta 5 pra sair (confere se saiu antes de apertar de novo). So nessa tela.
-    7. Acabaram as lancas e a barra NAO ta cheia -> para tudo e deixa morrer (pro auto click recomecar).
-       (lancas acabaram mas a barra ta cheia -> transforma normal)
+    7. Acabaram as lancas e a barra NAO ta cheia -> segura flipando um tempo, depois para tudo e deixa
+       morrer (pro auto click recomecar). (lancas acabaram mas a barra ta cheia -> transforma normal)
     8. Transformacao acabou e a missao NAO completou (sobrou titan) -> voa ate o titan que sobrou e se
        joga nele pra morrer e reiniciar.
 
@@ -32,7 +33,7 @@ local CONFIG = {
     ALTURA           = 250,  -- em cima do alvo, desce pra essa altura e comeca os flips
                              -- (mudou aqui, muda tudo junto: a queda e a subida acompanham)
     VELOCIDADE       = 70,   -- studs/s na ida ate o alvo
-    VELOCIDADE_DESCER = 40,  -- studs/s descendo de 500 pra 400
+    VELOCIDADE_DESCER = 40,  -- studs/s descendo de ALTURA_VOO pra ALTURA
 
     -- Flip do jogo (tecla simulada)
     FLIP_INTERVALO   = 0.8,  -- segundos entre um flip e outro
@@ -59,7 +60,7 @@ local CONFIG = {
     COMBO_RETENTATIVA    = 0.3,          -- nao entrou em cooldown nesse tempo -> aperta de novo
     COMBO_MAX_TENTATIVAS = 6,
     TRANSFORMAR_INTERVALO = {0.95, 1.3}, -- barra cheia: aperta 1 a cada ~1s
-    BARRA_TRANSFORMAR     = 0.95,        -- conta como "barra cheia" a partir de 95% (o jogo deixa transformar)
+    BARRA_TRANSFORMAR     = 0.60,        -- transforma a partir de 60% da barra (o jogo deixa)
     MORRER_SEM_LANCA      = true,        -- sem lanca + barra nao cheia -> para tudo e deixa morrer
     SEM_LANCA_ESPERA      = 20,          -- sem lanca: continua flipando/segurando no ar esse tempo antes de
                                          -- desistir (a barra ainda pode encher depois que as lancas acabam)
@@ -169,6 +170,7 @@ local function getRoot()
     if hrp and hum and hum.Health > 0 then return char, hrp end
 end
 
+-- "barra cheia" = a partir de BARRA_TRANSFORMAR (60%), que ja da pra transformar
 local function barraCheia()
     local bar, max = LP:GetAttribute("Bar"), LP:GetAttribute("Max_Bar")
     return type(bar) == "number" and type(max) == "number" and max > 0
@@ -376,7 +378,7 @@ end
 
 -- ================= ESTADO =================
 local alvoPos  = CONFIG.ALVO.Position
-local topo     = alvoPos + Vector3.new(0, CONFIG.ALTURA, 0) -- onde fica flipando (400)
+local topo     = alvoPos + Vector3.new(0, CONFIG.ALTURA, 0) -- onde fica flipando
 local fase     = "subindo" -- subindo -> indo -> descendo -> flipando <-> voltando
 local cruzeiro = alvoPos.Y + CONFIG.ALTURA_VOO -- altura da viagem (500, ou mais se ja tiver mais alto)
 local alvoSubida = topo.Y -- ate onde sobe na fase "voltando"
@@ -470,7 +472,7 @@ STATE.connect(RunService.Heartbeat, function()
         end
 
     elseif fase == "descendo" then
-        -- em cima do alvo o chao e baixo (terreno), entao aqui pode descer tranquilo pra 400
+        -- em cima do alvo o chao e baixo (terreno), entao aqui pode descer tranquilo
         if mover(hrp, topo, CONFIG.VELOCIDADE_DESCER) then
             fase = "flipando"; status("Cheguei em " .. CONFIG.ALTURA .. ", flips + skills")
         end
@@ -480,7 +482,7 @@ STATE.connect(RunService.Heartbeat, function()
             fase = "flipando"; status("Barra cheia, parei de subir")
             return
         end
-        -- sobe so no eixo Y: o lado (X/Z) fica livre pros flips/dash continuarem funcionando na subida
+        -- sobe so no eixo Y: o lado (X/Z) fica livre
         if hrp.Position.Y >= alvoSubida then
             fase = "flipando"; status("Voltei pra altura")
             return
@@ -517,8 +519,7 @@ protegido("flips", function()
         return
     end
 
-    -- so flipa la em cima (perto de 400). Caindo ou subindo de volta: sem flip
-    -- (cai ate 345 usando skill, mais perto dos titans, e sobe de volta pra 400)
+    -- so flipa la em cima (perto de ALTURA). Caindo ou subindo de volta: sem flip
     if fase ~= "flipando" or hrp.Position.Y < topo.Y - CONFIG.FAIXA_FLIP then
         task.wait(0.1)
         return
@@ -545,8 +546,7 @@ protegido("flips", function()
 end)
 
 -- ================= SKILLS =================
--- durante o combo a trava fica presa: buffs -> 3 -> 2 saem inteiros, sem flip no meio
--- (emCombo fica la em cima, no ESTADO, porque o loop de movimento tambem usa)
+-- durante o combo a trava fica presa: as skills da etapa saem inteiras, sem flip no meio
 local function usar(n)
     while tocandoFlip and vivo() do task.wait() end
     usandoSkill = true
@@ -572,8 +572,8 @@ local function usarConfirmado(n)
 end
 
 local function podeSeguir()
-    return vivo() and not fimDeMissao and not modoShift and not modoMorrer and not transformado() and chegou()
-        and getRoot() ~= nil and emFoco()
+    return vivo() and not fimDeMissao and not modoShift and not modoMorrer and not modoCacar
+        and not transformado() and chegou() and getRoot() ~= nil and emFoco()
 end
 
 -- Combo humano em duas subidas:
@@ -662,8 +662,8 @@ protegido("skills", function()
                 status(("Transformou na tentativa %d"):format(tentativasShift))
                 tentativasShift = 0
             elseif not barraCheia() then
-                -- a barra esvaziou sem transformar: sai do modo shift e volta ao ciclo normal
-                status("Barra nao ta mais cheia e nao transformou, voltando ao ciclo normal")
+                -- a barra caiu abaixo do minimo sem transformar: volta ao ciclo normal
+                status("Barra abaixo do minimo e nao transformou, voltando ao ciclo normal")
                 modoShift, tentativasShift = false, 0
             end
             proxTransformar = os.clock() + rand(0.3, 0.6) -- a confirmacao ja esperou ~1.5s
