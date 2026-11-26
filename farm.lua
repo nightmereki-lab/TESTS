@@ -5,7 +5,7 @@
     3. Perto de ALTURA: flip do jogo (D D / A A). Abaixo disso cai SEM flip ate ALTURA - QUEDA.
        Ai sobe de volta pra ALTURA e volta a flipar.
     4. Skills nas SUBIDAS de volta, alternando: uma subida usa os buffs (4, 5), cai, a subida seguinte
-       usa o ataque (3 -> 2, se sobrar lanca), e repete. So gasta buff se o ataque tambem estiver pronto.
+       usa o ataque (2 -> 3, se sobrar lanca), e repete. So gasta buff se o ataque tambem estiver pronto.
     5. Barra de shift a partir de BARRA_TRANSFORMAR (80%) -> para os flips, vai pro ponto inicial, cai e
        aperta 1 ate virar titan (confere se virou antes de apertar de novo).
     6. Titan (Colossal): abre com 4 -> 1 -> 3, depois um ataque atras do outro. Nunca a 5 durante a partida.
@@ -48,13 +48,13 @@ local CONFIG = {
     ALTURA_MINIMA    = 80,   -- seguranca: a menos disso do chao -> sobe tambem
     VELOCIDADE_SUBIR = 25,   -- studs/s na subida de volta (devagar = discreto)
 
-    -- Skills HUMANO. Combo: buffs -> 3 -> 2
+    -- Skills HUMANO. Combo: buffs -> 2 -> 3 (hotbar invertido: o ataque de 1 lanca agora e a 2)
     USAR_SKILLS          = true,
     SKILL_TRANSFORMAR    = 1,
     SKILLS_BUFF          = {4, 5},
-    SKILL_ATK_PEQUENO    = 3,   -- vem primeiro, precisa de LANCAS_PEQUENO
+    SKILL_ATK_PEQUENO    = 2,   -- vem primeiro, precisa de LANCAS_PEQUENO (1 lanca)
     LANCAS_PEQUENO       = 1,
-    SKILL_ATK_GRANDE     = 2,   -- vem depois, precisa de LANCAS_GRANDE
+    SKILL_ATK_GRANDE     = 3,   -- vem depois, precisa de LANCAS_GRANDE (4 lancas)
     LANCAS_GRANDE        = 4,
     COMBO_PAUSA          = {0.08, 0.18}, -- entre uma skill e outra (depois de confirmar que saiu)
     COMBO_RETENTATIVA    = 0.3,          -- nao entrou em cooldown nesse tempo -> aperta de novo
@@ -577,7 +577,7 @@ local function podeSeguir()
 end
 
 -- Combo humano em duas subidas:
---   subida 1: buffs (4, 5)  ->  cai  ->  subida 2: ataque (3 -> 2, se sobrar lanca)  ->  repete
+--   subida 1: buffs (4, 5)  ->  cai  ->  subida 2: ataque (2 -> 3, se sobrar lanca)  ->  repete
 -- So gasta buff se os ataques tambem estiverem prontos (pra eles sairem na subida seguinte).
 local etapaCombo  = "buff" -- o que a PROXIMA subida vai usar: "buff" ou "atk"
 local subidaUsada = 0      -- numero da ultima subida que ja usou skill (uma etapa por subida)
@@ -686,7 +686,7 @@ protegido("skills", function()
         end
 
     elseif CONFIG.USAR_SKILLS then
-        -- combo humano na SUBIDA de volta: uma subida buffs, a seguinte ataque (3 -> 2)
+        -- combo humano na SUBIDA de volta: uma subida buffs, a seguinte ataque (2 -> 3)
         if fase == "voltando" then tentarComboHumano() end
     end
 end)
