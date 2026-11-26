@@ -6,7 +6,7 @@
        Ai sobe de volta pra ALTURA e volta a flipar.
     4. Skills nas SUBIDAS de volta, alternando: uma subida usa os buffs (4, 5), cai, a subida seguinte
        usa o ataque (3 -> 2, se sobrar lanca), e repete. So gasta buff se o ataque tambem estiver pronto.
-    5. Barra de shift a partir de BARRA_TRANSFORMAR (60%) -> para os flips, vai pro ponto inicial, cai e
+    5. Barra de shift a partir de BARRA_TRANSFORMAR (80%) -> para os flips, vai pro ponto inicial, cai e
        aperta 1 ate virar titan (confere se virou antes de apertar de novo).
     6. Titan (Colossal): abre com 4 -> 1 -> 3, depois um ataque atras do outro. Nunca a 5 durante a partida.
     6b. Tela "MISSION COMPLETED" (ou "RAID COMPLETED") apareceu -> para flips e skills, e se estiver de
@@ -60,7 +60,7 @@ local CONFIG = {
     COMBO_RETENTATIVA    = 0.3,          -- nao entrou em cooldown nesse tempo -> aperta de novo
     COMBO_MAX_TENTATIVAS = 6,
     TRANSFORMAR_INTERVALO = {0.95, 1.3}, -- barra cheia: aperta 1 a cada ~1s
-    BARRA_TRANSFORMAR     = 0.60,        -- transforma a partir de 60% da barra (o jogo deixa)
+    BARRA_TRANSFORMAR     = 0.80,        -- transforma a partir de 80% da barra (o jogo deixa)
     MORRER_SEM_LANCA      = true,        -- sem lanca + barra nao cheia -> para tudo e deixa morrer
     SEM_LANCA_ESPERA      = 20,          -- sem lanca: continua flipando/segurando no ar esse tempo antes de
                                          -- desistir (a barra ainda pode encher depois que as lancas acabam)
@@ -170,7 +170,7 @@ local function getRoot()
     if hrp and hum and hum.Health > 0 then return char, hrp end
 end
 
--- "barra cheia" = a partir de BARRA_TRANSFORMAR (60%), que ja da pra transformar
+-- "barra cheia" = a partir de BARRA_TRANSFORMAR (80%), que ja da pra transformar
 local function barraCheia()
     local bar, max = LP:GetAttribute("Bar"), LP:GetAttribute("Max_Bar")
     return type(bar) == "number" and type(max) == "number" and max > 0
