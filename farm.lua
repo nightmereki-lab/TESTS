@@ -10,8 +10,7 @@
     6. Titan (Colossal): abre com 4 -> 1 -> 3, depois um ataque atras do outro. Nunca a 5 durante a partida.
     6b. Tela "MISSION COMPLETED" (ou "RAID COMPLETED") apareceu -> para flips e skills, e se estiver de
         titan aperta 5 pra sair (confere se saiu antes de apertar de novo). So nessa tela.
-    7. Acabaram as lancas e a barra NAO ta cheia -> voa ate o titan que sobrou e se joga nele pra
-       morrer e reiniciar (mesmo comportamento do modoCacar).
+    7. Acabaram as lancas e a barra NAO ta cheia -> para tudo e deixa morrer (pro auto click recomecar).
        (lancas acabaram mas a barra ta cheia -> transforma normal)
     8. Transformacao acabou e a missao NAO completou (sobrou titan) -> voa ate o titan que sobrou e se
        joga nele pra morrer e reiniciar.
@@ -60,7 +59,8 @@ local CONFIG = {
     COMBO_RETENTATIVA    = 0.3,          -- nao entrou em cooldown nesse tempo -> aperta de novo
     COMBO_MAX_TENTATIVAS = 6,
     TRANSFORMAR_INTERVALO = {0.95, 1.3}, -- barra cheia: aperta 1 a cada ~1s
-    MORRER_SEM_LANCA      = true,        -- sem lanca + barra nao cheia -> vai se jogar no titan
+    BARRA_TRANSFORMAR     = 0.95,        -- conta como "barra cheia" a partir de 95% (o jogo deixa transformar)
+    MORRER_SEM_LANCA      = true,        -- sem lanca + barra nao cheia -> para tudo e deixa morrer
     SEM_LANCA_ESPERA      = 20,          -- sem lanca: continua flipando/segurando no ar esse tempo antes de
                                          -- desistir (a barra ainda pode encher depois que as lancas acabam)
     TRANSFORMAR_CONFIRMA  = 1.5,         -- depois de apertar 1, espera isso pra ver se virou titan
@@ -171,7 +171,8 @@ end
 
 local function barraCheia()
     local bar, max = LP:GetAttribute("Bar"), LP:GetAttribute("Max_Bar")
-    return type(bar) == "number" and type(max) == "number" and max > 0 and bar >= max
+    return type(bar) == "number" and type(max) == "number" and max > 0
+        and bar >= max * CONFIG.BARRA_TRANSFORMAR
 end
 
 local function transformado()
@@ -386,21 +387,20 @@ local emCombo     = false -- etapa do combo rodando (segura os flips)
 local numSubida   = 0     -- conta as subidas de volta (cada uma usa uma etapa do combo)
 local modoShift   = false -- barra cheia: sem flip, vai pro ponto inicial e cai apertando 1
 local shiftEtapa  = "indo" -- "indo" = voltando pro ponto inicial; "caindo" = solto, apertando 1
-local modoMorrer  = false -- (legado) sem lanca + barra nao cheia
+local modoMorrer  = false -- sem lanca + barra nao cheia: nao faz mais nada, deixa morrer
 local semLancaDesde = nil
-local modoCacar   = false -- saiu do titan sem a missao completar OU sem lanca: vai se jogar no titan
+local modoCacar   = false -- saiu do titan sem a missao completar: vai se jogar no titan que sobrou
 local eraTitan    = false -- (fica aqui em cima porque o Heartbeat e o respawn tambem usam)
 
 local function chegou() return fase == "flipando" or fase == "voltando" end
 
--- Sem lanca e barra nao cheia por SEM_LANCA_ESPERA segundos -> modoCacar (se joga no titan).
+-- Sem lanca e barra nao cheia por SEM_LANCA_ESPERA segundos -> modoMorrer.
 -- So conta quando o atributo "Spears" existe (no spawn ele ainda nao existe e daria falso 0).
 local function checarMorrer()
     if not CONFIG.MORRER_SEM_LANCA then return end
     if modoMorrer then
         if barraCheia() then
-            modoMorrer = false
-            status("Barra encheu, saindo do modo morrer pra transformar")
+            modoMorrer = false; status("Barra encheu, saindo do modo morrer pra transformar")
         end
         return
     end
@@ -412,9 +412,8 @@ local function checarMorrer()
             status(("Lancas acabaram: segurando no ar flipando por %ds esperando a barra"):format(CONFIG.SEM_LANCA_ESPERA))
         end
         if os.clock() - semLancaDesde >= CONFIG.SEM_LANCA_ESPERA then
-            -- Em vez de so cair, vai se jogar no titan (igual pos-transformacao)
-            modoCacar = true
-            status("Sem lanca e barra nao cheia: indo me jogar no titan pra morrer e recomecar")
+            modoMorrer = true
+            status("Sem lanca e barra nao cheia: parei tudo, deixando morrer pra recomecar")
         end
     else
         semLancaDesde = nil
@@ -427,11 +426,10 @@ STATE.connect(RunService.Heartbeat, function()
     local char, hrp = getRoot()
     if not char then return end
 
-    -- Saiu do titan sem a missao completar (ou sem lanca): voa ate o titan que sobrou e se joga nele
+    -- Saiu do titan sem a missao completar: voa ate o titan que sobrou e se joga nele (pra morrer e reiniciar)
     if modoCacar then
         if fimDeMissao or transformado() then
-            modoCacar = false
-            status("Missao completou (ou transformou de novo), parei de ir no titan")
+            modoCacar = false; status("Missao completou (ou transformou de novo), parei de ir no titan")
         else
             local alvo = acharTitan(hrp)
             if alvo then
@@ -450,13 +448,11 @@ STATE.connect(RunService.Heartbeat, function()
     if modoShift and chegou() and not transformado() then
         if shiftEtapa == "indo" then
             if mover(hrp, topo, CONFIG.VELOCIDADE) then
-                shiftEtapa = "caindo"
-                status("No ponto inicial, caindo pra transformar")
+                shiftEtapa = "caindo"; status("No ponto inicial, caindo pra transformar")
             end
         elseif alturaDoChao(hrp) < CONFIG.ALTURA_MINIMA then
             -- caiu ate perto do chao e NAO transformou: volta pro ponto e tenta de novo (nao larga no chao)
-            shiftEtapa = "indo"
-            status("Nao transformou na queda, voltando pro ponto pra tentar de novo")
+            shiftEtapa = "indo"; status("Nao transformou na queda, voltando pro ponto pra tentar de novo")
         end
         return -- "caindo": nao segura nada, so cai (o loop de skills aperta o 1)
     end
@@ -465,33 +461,28 @@ STATE.connect(RunService.Heartbeat, function()
         -- sobe ate 500 (se o chao do spawn ja for mais alto, usa a altura atual: nunca desce pra dentro do chao)
         cruzeiro = math.max(alvoPos.Y + CONFIG.ALTURA_VOO, hrp.Position.Y)
         if mover(hrp, Vector3.new(hrp.Position.X, cruzeiro, hrp.Position.Z), CONFIG.VELOCIDADE) then
-            fase = "indo"
-            status(("No alto (%d), indo ate o alvo"):format(math.floor(cruzeiro - alvoPos.Y)))
+            fase = "indo"; status(("No alto (%d), indo ate o alvo"):format(math.floor(cruzeiro - alvoPos.Y)))
         end
 
     elseif fase == "indo" then
         if mover(hrp, Vector3.new(topo.X, cruzeiro, topo.Z), CONFIG.VELOCIDADE) then
-            fase = "descendo"
-            status(("Em cima do alvo, descendo pra %d"):format(CONFIG.ALTURA))
+            fase = "descendo"; status(("Em cima do alvo, descendo pra %d"):format(CONFIG.ALTURA))
         end
 
     elseif fase == "descendo" then
         -- em cima do alvo o chao e baixo (terreno), entao aqui pode descer tranquilo pra 400
         if mover(hrp, topo, CONFIG.VELOCIDADE_DESCER) then
-            fase = "flipando"
-            status("Cheguei em " .. CONFIG.ALTURA .. ", flips + skills")
+            fase = "flipando"; status("Cheguei em " .. CONFIG.ALTURA .. ", flips + skills")
         end
 
     elseif fase == "voltando" then
         if barraCheia() or transformado() then
-            fase = "flipando"
-            status("Barra cheia, parei de subir")
+            fase = "flipando"; status("Barra cheia, parei de subir")
             return
         end
         -- sobe so no eixo Y: o lado (X/Z) fica livre pros flips/dash continuarem funcionando na subida
         if hrp.Position.Y >= alvoSubida then
-            fase = "flipando"
-            status("Voltei pra altura")
+            fase = "flipando"; status("Voltei pra altura")
             return
         end
         local v = hrp.AssemblyLinearVelocity
@@ -503,8 +494,7 @@ STATE.connect(RunService.Heartbeat, function()
         if caiu or alturaDoChao(hrp) < CONFIG.ALTURA_MINIMA then
             alvoSubida = topo.Y
             numSubida += 1
-            fase = "voltando"
-            status(("Caiu ate %d, voltando pra %d"):format(CONFIG.ALTURA - CONFIG.QUEDA, CONFIG.ALTURA))
+            fase = "voltando"; status(("Caiu ate %d, voltando pra %d"):format(CONFIG.ALTURA - CONFIG.QUEDA, CONFIG.ALTURA))
         end
     end
 end)
@@ -881,8 +871,7 @@ STATE.connect(LP.CharacterAdded, function()
         status("Saiu do titan e a missao nao completou: indo me jogar no titan que sobrou")
     else
         modoCacar = false
-        fase = "subindo"
-        status("Renasceu, recomecando")
+        fase = "subindo"; status("Renasceu, recomecando")
     end
 end)
 
